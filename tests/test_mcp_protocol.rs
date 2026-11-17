@@ -15,9 +15,14 @@ struct Client {
 
 impl Client {
     async fn new() -> Self {
+        Self::with_args(&[]).await
+    }
+
+    async fn with_args(args: &[&str]) -> Self {
         let cwd = tempfile::tempdir().unwrap();
         let mut command = Command::new(env!("CARGO_BIN_EXE_airgap"));
         command
+            .args(args)
             .current_dir(cwd.path())
             .env_clear()
             .stdin(Stdio::piped())
@@ -50,10 +55,15 @@ impl Client {
         self.send(json!({"jsonrpc":"2.0", "id":id, "method":method, "params":params}))
             .await;
         let mut line = String::new();
-        tokio::time::timeout(Duration::from_secs(5), self.output.read_line(&mut line))
-            .await
-            .unwrap()
-            .unwrap();
+        // Cold native process startup can include an antivirus scan on Windows CI.
+        let deadline = if method == "initialize" { 15 } else { 5 };
+        tokio::time::timeout(
+            Duration::from_secs(deadline),
+            self.output.read_line(&mut line),
+        )
+        .await
+        .unwrap()
+        .unwrap();
         let response: Value =
             serde_json::from_str(&line).expect("stdout must contain only JSON-RPC");
         assert_eq!(response["id"], id);
@@ -74,6 +84,17 @@ impl Client {
             .unwrap()
             .unwrap();
         assert!(status.success());
+    }
+}
+
+#[tokio::test]
+async fn test_cli_stdio_passthrough() {
+    for args in [&[][..], &["--mcp"][..]] {
+        let mut client = Client::with_args(args).await;
+        client.initialize().await;
+        let response = client.request(2, "tools/list", json!({})).await;
+        assert_eq!(response["result"]["tools"].as_array().unwrap().len(), 7);
+        client.close().await;
     }
 }
 

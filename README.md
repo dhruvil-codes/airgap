@@ -26,37 +26,47 @@ No local Docker or Python runtime is required. Cloud tools are billable; local s
 
 ## Quick start
 
-Install [Rust 1.89 or newer](https://www.rust-lang.org/tools/install) and your platform's native linker, then build from source:
+### Install and set up in one command
+
+macOS or Linux:
 
 ```sh
-git clone https://github.com/dhruvil-codes/airgap.git
-cd airgap
-cargo install --path . --locked
+curl -fsSL https://raw.githubusercontent.com/dhruvil-codes/airgap/main/scripts/install.sh | bash
 ```
 
-Set `GMI_AGENTBOX_API_KEY` to a compute-scoped key and `GMI_MAAS_API_KEY` to an inference key in the environment that starts your MCP client. See [.env.example](.env.example) for supported configuration names. Keep real credentials out of version control.
+Windows PowerShell:
 
-Add this server entry to your MCP client's configuration:
-
-```json
-{
-  "mcpServers": {
-    "airgap": {
-      "command": "airgap",
-      "env": {
-        "GMI_AGENTBOX_API_KEY": "your-compute-key",
-        "GMI_MAAS_API_KEY": "your-inference-key"
-      }
-    }
-  }
-}
+```powershell
+irm https://raw.githubusercontent.com/dhruvil-codes/airgap/main/scripts/install.ps1 | iex
 ```
 
-The values above are placeholders. Use an absolute binary path if your client cannot find `airgap` on PATH. Cursor uses `.cursor/mcp.json`; Claude Desktop uses `claude_desktop_config.json`; Claude Code supports the `mcpServers` block in its user MCP configuration. These client-specific integrations have not been tested live.
+Installers fetch a published release, verify its SHA-256 checksum, install the binary, and run `airgap setup --yes`. No Rust or Python is required. If no release has been published yet, use Cargo below. Download time and client approvals mean five-second setup is a goal, not a guarantee.
 
-`airgap` is a stdio server, so running it directly waits for an MCP client. Stdout carries JSON-RPC only; diagnostics go to stderr.
+### Or install from source with Cargo
 
-For a first tool call, pass the arguments in [examples/sandbox-run.json](examples/sandbox-run.json) to `airgap_sandbox_run`. It uploads a small Rust project and runs its test suite remotely. There is also a [local redaction example](examples/redact-secrets.json).
+Requires [Rust 1.89 or newer](https://www.rust-lang.org/tools/install) and a native linker:
+
+```sh
+cargo install --git https://github.com/dhruvil-codes/airgap --locked
+airgap setup
+```
+
+This uses the repository directly; a crates.io publication is not assumed. Run setup from your workspace. It discovers GMI keys in the environment or trusted `.env` / `cloudvet.env` files. Missing keys do not block configuration: local scanners work, and you can set `GMI_AGENTBOX_API_KEY` and `GMI_MAAS_API_KEY` and rerun setup later. See [.env.example](.env.example).
+
+```sh
+airgap setup --yes              # detected editors; all three if none detected
+airgap init --cursor --yes      # Cursor configuration only
+airgap setup --rules-only --yes # workspace routing instructions only
+airgap doctor                  # bounded credential/connectivity checks
+```
+
+Setup merges Cursor, Claude Code and VS Code settings without removing other servers, uses the executable's absolute path, and preserves team instructions around its managed rule block. Repeated runs leave identical files unchanged. Discovered keys are stored in editor config files; keep those files out of version control.
+
+Reload your client, approve the server if requested, and prompt normally, for example `run tests`. Routing rules guide the agent toward remote tools; they cannot enforce tool permissions or guarantee tool selection. See [the setup guide](docs/setup.md) for exact destinations and flags.
+
+No arguments or `--mcp` serves MCP JSON-RPC on stdout. Help, version, setup and doctor are terminal commands and do not start an MCP session.
+
+For a first sandbox call, use [examples/sandbox-run.json](examples/sandbox-run.json). There is also a [local redaction example](examples/redact-secrets.json).
 
 ## Security boundary
 
@@ -70,6 +80,7 @@ Read the [threat model](docs/security-model.md) and [security reporting policy](
 
 ## Documentation
 
+- [Automatic setup, installer options, and doctor](docs/setup.md)
 - [Tool inputs, configuration, limits, and cleanup](docs/reference.md)
 - [Architecture and source map](docs/architecture.md)
 - [Validation results and known limitations](docs/validation.md)

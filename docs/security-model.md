@@ -20,6 +20,8 @@ Sandbox and verification snapshots are uploaded unchanged. Do not submit secrets
 
 ## Host-side controls
 
+The explicit `setup`/`init` commands write local editor configuration and routing instructions, separate from MCP mode. They can store discovered keys in workspace and user config files. See [setup credential handling](setup.md#credentials). Symlinked config files and immediate parent directories are refused rather than redirecting credential writes.
+
 - Snapshot paths must be relative, with no traversal, Windows drive prefixes, control characters or `.git` metadata. Files are regular UTF-8 entries with mode 0644.
 - Snapshot size, file count, command length, scanner input and provider response size are bounded.
 - Provider configuration requires HTTPS. Redirects and automatic proxies are disabled.
