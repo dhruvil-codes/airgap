@@ -1,0 +1,43 @@
+name: Bug report
+description: Report a reproducible problem in airgap.
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        For vulnerabilities or credential exposure, use SECURITY.md instead of a public issue.
+        Use synthetic inputs. Never paste API keys, private source, or sandbox access tokens.
+  - type: input
+    id: version
+    attributes:
+      label: Version or commit
+      description: Include the Rust version if you built from source.
+    validations:
+      required: true
+  - type: input
+    id: environment
+    attributes:
+      label: Environment
+      description: OS, architecture, MCP client, and tool name.
+    validations:
+      required: true
+  - type: textarea
+    id: reproduce
+    attributes:
+      label: Steps to reproduce
+      description: Small, synthetic tool arguments and exact steps.
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected behavior
+    validations:
+      required: true
+  - type: textarea
+    id: actual
+    attributes:
+      label: Actual behavior and sanitized diagnostics
+      description: For provider issues, include the time, model or image, region, and HTTP status. Do not include credentials or raw headers.
+    validations:
+      required: true

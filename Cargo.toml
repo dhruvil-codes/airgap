@@ -1,0 +1,42 @@
+[package]
+name = "airgap"
+version = "0.1.0"
+edition = "2021"
+rust-version = "1.89"
+authors = ["Dhruvil Mistry <dhruvil@bydhruvil.in>"]
+description = "Remote sandbox execution and defensive security tools over MCP"
+license = "MIT OR Apache-2.0"
+readme = "README.md"
+repository = "https://github.com/dhruvil-codes/airgap"
+keywords = ["mcp", "sandbox", "security", "ai", "gmi"]
+categories = ["command-line-utilities", "development-tools"]
+include = ["src/**", "tests/**", "docs/**", "examples/**", "scripts/**", "Cargo.toml", "Cargo.lock", "README.md", "CHANGELOG.md", "CONTRIBUTING.md", "CODE_OF_CONDUCT.md", "SECURITY.md", "LICENSE-*", ".env.example"]
+
+[dependencies]
+rmcp = { version = "3.10", default-features = false, features = ["server", "macros", "schemars", "transport-io"] }
+tokio = { version = "1.40", features = ["rt-multi-thread", "macros", "io-std", "signal", "time", "sync"] }
+tokio-util = { version = "0.7", features = ["rt"] }
+reqwest = { version = "0.12", default-features = false, features = ["json", "rustls-tls", "multipart", "http2"] }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+anyhow = "1"
+regex = "1.10"
+sha2 = "0.10"
+tar = "0.4"
+flate2 = "1"
+uuid = { version = "1.10", features = ["v4"] }
+chrono = { version = "0.4", default-features = false, features = ["clock", "serde"] }
+dotenvy = "0.15"
+toml = "0.8"
+
+[dev-dependencies]
+wiremock = "0.6"
+tempfile = "3"
+tokio = { version = "1.40", features = ["process", "io-util"] }
+
+[profile.release]
+opt-level = 3
+lto = true
+codegen-units = 1
+panic = "abort"
+strip = true

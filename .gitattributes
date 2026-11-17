@@ -1,0 +1,10 @@
+* text=auto eol=lf
+*.rs text
+*.md text
+*.json text
+*.toml text
+*.yml text
+*.ps1 text
+*.png binary
+*.zip binary
+*.gz binary

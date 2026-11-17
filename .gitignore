@@ -1,0 +1,15 @@
+/target/
+.env
+cloudvet.env
+*.env
+!.env.example
+.worktrees/
+.artifacts/
+/dist/
+.env.*
+!.env.example
+.DS_Store
+Thumbs.db
+*.swp
+*.swo
+/.idea/

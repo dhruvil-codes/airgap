@@ -1,0 +1,8 @@
+{
+  "command": "cargo test --quiet",
+  "files": {
+    "Cargo.toml": "[package]\nname = \"airgap-example\"\nversion = \"0.1.0\"\nedition = \"2021\"\n",
+    "src/lib.rs": "#[test]\nfn arithmetic() { assert_eq!(2 + 2, 4); }\n"
+  },
+  "timeout_secs": 120
+}
