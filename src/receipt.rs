@@ -3,7 +3,13 @@ use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 
 pub fn fingerprint(value: &impl Serialize) -> Result<String> {
-    Ok(format!("{:x}", Sha256::digest(serde_json::to_vec(value)?)))
+    let digest = Sha256::digest(serde_json::to_vec(value)?);
+    let mut out = String::with_capacity(64);
+    for b in digest {
+        use std::fmt::Write;
+        let _ = write!(out, "{:02x}", b);
+    }
+    Ok(out)
 }
 
 #[derive(Debug, Serialize, Deserialize)]
