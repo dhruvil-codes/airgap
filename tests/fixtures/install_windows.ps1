@@ -38,9 +38,9 @@ $hash=(Get-FileHash "$testRoot/asset.zip" -Algorithm SHA256).Hash.ToLowerInvaria
 if($LASTEXITCODE -ne 0){throw 'Valid installer failed'}
 $config=[System.IO.File]::ReadAllText("$testRoot/.cursor/mcp.json")|ConvertFrom-Json
 if($config.mcpServers.keep.command -ne 'existing'){throw 'Setup overwrote another server'}
-$before=[System.IO.File]::ReadAllBytes("$testRoot/.mcp.json")
+$before=[System.IO.File]::ReadAllBytes("$testRoot/.cursor/mcp.json")
 & $Installer
-$after=[System.IO.File]::ReadAllBytes("$testRoot/.mcp.json")
+$after=[System.IO.File]::ReadAllBytes("$testRoot/.cursor/mcp.json")
 if([Convert]::ToBase64String($before) -ne [Convert]::ToBase64String($after)){throw 'Repeated installation was not idempotent'}
 if(-not [System.IO.File]::ReadAllText("$testRoot/CLAUDE.md").StartsWith('# Existing team instructions')){throw 'Team instructions were overwritten'}
 $oldHash=(Get-FileHash "$testRoot/bin/airgap.exe").Hash
