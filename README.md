@@ -8,7 +8,7 @@
 
 airgap is a Rust [Model Context Protocol](https://modelcontextprotocol.io/) server. It sends explicitly supplied files and commands to disposable GMI AgentBox sandboxes and exposes local scanners and model-assisted security review over stdio. Submitted commands never execute on the machine running the server.
 
-> **Early development.** Local tests and a native Windows release build are validated. Live sandbox execution and inference work with the tested account. Patch verification currently receives HTTP 403 from GMI's execution endpoint. See the [validation record](docs/validation.md) before relying on the results.
+> **Early development.** Offline tests and release builds pass on Linux, macOS and Windows. Live sandbox execution and inference work with the tested account from Windows. Patch verification currently receives HTTP 403 from GMI's execution endpoint. See the [validation record](docs/validation.md) before relying on the results.
 
 ## What it does
 

@@ -37,7 +37,7 @@ cargo build --release --locked
 cargo package --list --allow-dirty --locked
 ```
 
-CI is configured to run stable-toolchain checks on Linux, macOS and Windows, plus an MSRV check on Rust 1.89. Workflow success still needs to be observed on GitHub; configuration alone is not evidence that a platform works.
+CI runs stable-toolchain checks on Linux, macOS and Windows, plus an MSRV check on Rust 1.89. Check the results for your change on GitHub; configuration alone is not evidence that a platform works.
 
 If Windows compilation fails under memory pressure, use one build job and omit development debug symbols for that shell session:
 

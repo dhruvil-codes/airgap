@@ -9,7 +9,7 @@ Recorded on 2026-11-17 with Rust 1.99.1 on Windows x86_64 GNU. These results des
 - `cargo build --release --locked` produced a stripped native Windows executable.
 - Default tests use local mocks and a child process. They require no GMI keys and create no billable resources.
 
-The repository configures Linux, macOS, Windows and minimum-Rust-version CI. A configured job is not evidence of a successful run; consult [GitHub Actions](https://github.com/dhruvil-codes/airgap/actions) for the current commit's results.
+The [initial GitHub CI run](https://github.com/dhruvil-codes/airgap/actions/runs/44098293818) passed on commit `74fd005`: native tests and release builds on Linux, macOS and Windows, Rust 1.89 all-target checks, static Linux musl compilation, and formatting/lint/docs/packaging checks. These are offline checks, not additional live provider tests. Consult [GitHub Actions](https://github.com/dhruvil-codes/airgap/actions) for the current commit's results.
 
 ## Release measurements
 

@@ -22,4 +22,4 @@ Changes are recorded here before a release. Version 0.1.0 in Cargo.toml identifi
 
 - Live patch verification receives HTTP 403 at the AgentBox execution endpoint on the tested account.
 - Model output can be incorrect or malformed; malformed output fails closed.
-- Linux and macOS runtime validation remains pending. Measured Windows latency exceeds the original targets.
+- Live provider checks have only been run from Windows. Measured Windows latency exceeds the original targets.
