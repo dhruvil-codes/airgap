@@ -3,19 +3,25 @@ $ErrorActionPreference = 'Stop'
 if ([Environment]::OSVersion.Platform -ne [PlatformID]::Win32NT) { throw 'Use scripts/install.sh on Linux and macOS' }
 [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
 Add-Type -AssemblyName System.IO.Compression.FileSystem
-$architecture = [System.Runtime.InteropServices.RuntimeInformation]::OSArchitecture.ToString()
-$target = switch ($architecture) {
-    'X64' { 'x86_64-pc-windows-msvc' }
-    'Arm64' { 'aarch64-pc-windows-msvc' }
-    default { throw 'airgap supports 64-bit x86 and ARM Windows.' }
+$isArm64 = ($env:PROCESSOR_ARCHITEW6432 -eq 'ARM64') -or ($env:PROCESSOR_ARCHITECTURE -eq 'ARM64')
+$target = if ($isArm64) {
+    'aarch64-pc-windows-msvc'
+} elseif ([Environment]::Is64BitOperatingSystem) {
+    'x86_64-pc-windows-msvc'
+} else {
+    throw 'airgap supports 64-bit x86 and ARM Windows.'
 }
 $base = 'https://github.com/dhruvil-codes/airgap/releases'
-if ($env:AIRGAP_VERSION) { $tag = 'v' + $env:AIRGAP_VERSION.TrimStart('v') }
-else {
-    try { $tag = (Invoke-RestMethod 'https://api.github.com/repos/dhruvil-codes/airgap/releases/latest' -TimeoutSec 10).tag_name }
-    catch { throw 'No published airgap release could be resolved. See the repository for source installation.' }
+if ($env:AIRGAP_VERSION) {
+    $tag = 'v' + ($env:AIRGAP_VERSION -replace '^v', '')
+} else {
+    try {
+        $tag = (Invoke-RestMethod 'https://api.github.com/repos/dhruvil-codes/airgap/releases/latest' -TimeoutSec 10).tag_name
+    } catch {
+        throw 'No published airgap release could be resolved. See the repository for source installation.'
+    }
 }
-if ($tag -notmatch '^v[0-9][0-9A-Za-z.+-]*$') { throw 'Invalid release version' }
+if (-not $tag -or $tag -notmatch '^v[0-9][0-9A-Za-z.+-]*$') { throw 'Invalid release version' }
 $archiveName = "airgap-$tag-$target.zip"
 $userHome = $env:USERPROFILE
 if (-not $userHome) { $userHome = [Environment]::GetFolderPath('UserProfile') }
@@ -41,21 +47,44 @@ try {
         $expectedNames = @('airgap.exe', 'LICENSE-MIT', 'LICENSE-APACHE') | Sort-Object
         if (($names -join ',') -cne ($expectedNames -join ',')) { throw 'Unexpected archive members' }
         $entry = $zip.GetEntry('airgap.exe')
+        if (-not $entry) { throw 'Archive does not contain airgap.exe' }
         if ($entry.Length -gt 128MB) { throw 'Release executable is unexpectedly large' }
         $binaryPath = Join-Path $tempRoot 'airgap.exe'
         $source = $entry.Open()
         $destination = [System.IO.File]::Open($binaryPath, [System.IO.FileMode]::CreateNew)
         try { $source.CopyTo($destination) } finally { $source.Dispose(); $destination.Dispose() }
     } finally { $zip.Dispose() }
-    $version = & $binaryPath --version
-    if ($LASTEXITCODE -ne 0 -or $version -cne "airgap $($tag.Substring(1))") { throw 'Executable version does not match the release' }
+    $expectedVer = 'airgap ' + ($tag -replace '^v', '')
+    $versionOutput = $null
+    $prevEAP = $ErrorActionPreference
+    try {
+        $ErrorActionPreference = 'Continue'
+        $versionOutput = (& $binaryPath --version 2>&1 | Out-String).Trim()
+    } finally {
+        $ErrorActionPreference = $prevEAP
+    }
+    if ($LASTEXITCODE -ne 0 -or $versionOutput -ne $expectedVer) {
+        throw "Executable version ($versionOutput) does not match expected release ($expectedVer)"
+    }
     $null = New-Item -ItemType Directory -Force -Path $installDir
     $installed = Join-Path $installDir 'airgap.exe'
     $staged = Join-Path $installDir ('.airgap-' + [guid]::NewGuid().ToString('N') + '.exe')
-    Copy-Item -LiteralPath $binaryPath -Destination $staged
-    if (Test-Path -LiteralPath $installed) { [System.IO.File]::Replace($staged, $installed, [NullString]::Value) }
-    else { [System.IO.File]::Move($staged, $installed) }
-    $staged = $null
+    Move-Item -LiteralPath $binaryPath -Destination $staged
+    if (Test-Path -LiteralPath $installed) {
+        $oldInstalled = Join-Path $installDir ('.airgap-' + [guid]::NewGuid().ToString('N') + '.old')
+        Move-Item -LiteralPath $installed -Destination $oldInstalled -Force
+        try {
+            Move-Item -LiteralPath $staged -Destination $installed -Force
+            $staged = $null
+        } catch {
+            Move-Item -LiteralPath $oldInstalled -Destination $installed -Force
+            throw
+        }
+        try { Remove-Item -LiteralPath $oldInstalled -Force -ErrorAction SilentlyContinue } catch {}
+    } else {
+        Move-Item -LiteralPath $staged -Destination $installed -Force
+        $staged = $null
+    }
     if ($env:AIRGAP_NO_PATH_UPDATE -ne '1') {
         try {
             $userPath = [Environment]::GetEnvironmentVariable('Path', 'User')
@@ -63,13 +92,24 @@ try {
         } catch { Write-Warning 'Could not persist PATH. Editor configuration will still use the full executable path.' }
         if (@($env:PATH -split ';') -notcontains $installDir) { $env:PATH = $installDir + ';' + $env:PATH }
     }
-    & $installed setup --yes
+    $prevEAP = $ErrorActionPreference
+    try {
+        $ErrorActionPreference = 'Continue'
+        & $installed setup --yes
+    } finally {
+        $ErrorActionPreference = $prevEAP
+    }
     if ($LASTEXITCODE -ne 0) { throw 'Installed airgap, but setup failed; run airgap setup --yes after resolving the reported configuration error' }
     Write-Output "Installed $tag to $installed"
 } finally {
-    if ($staged -and (Test-Path -LiteralPath $staged)) { Remove-Item -LiteralPath $staged -Force }
-    $resolvedTemp = [System.IO.Path]::GetFullPath($tempRoot)
-    if (-not $resolvedTemp.StartsWith($tempParent + [System.IO.Path]::DirectorySeparatorChar, [StringComparison]::Ordinal)) { throw 'Refusing cleanup outside the temporary directory' }
-    Remove-Item -LiteralPath $resolvedTemp -Recurse -Force
+    if ($staged -and (Test-Path -LiteralPath $staged)) {
+        Remove-Item -LiteralPath $staged -Force -ErrorAction SilentlyContinue
+    }
+    if ($tempRoot -and (Test-Path -LiteralPath $tempRoot)) {
+        $resolvedTemp = [System.IO.Path]::GetFullPath($tempRoot)
+        if ($tempParent -and $resolvedTemp.StartsWith($tempParent + [System.IO.Path]::DirectorySeparatorChar, [StringComparison]::Ordinal)) {
+            Remove-Item -LiteralPath $resolvedTemp -Recurse -Force -ErrorAction SilentlyContinue
+        }
+    }
 }
 }
