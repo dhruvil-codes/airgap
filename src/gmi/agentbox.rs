@@ -466,9 +466,18 @@ pub fn pack_files(files: &Files) -> Result<Vec<u8>> {
 }
 
 pub fn detect_image(files: &Files) -> &'static str {
-    if files.contains_key("Cargo.toml") {
+    if files.contains_key("Cargo.toml") || files.keys().any(|p| p.ends_with(".rs")) {
         "docker.io/library/rust:1-bookworm"
-    } else if files.contains_key("package.json") {
+    } else if files.contains_key("package.json")
+        || files.keys().any(|p| {
+            p.ends_with(".ts")
+                || p.ends_with(".tsx")
+                || p.ends_with(".js")
+                || p.ends_with(".jsx")
+                || p.ends_with(".mjs")
+                || p.ends_with(".cjs")
+        })
+    {
         "docker.io/library/node:20-bookworm"
     } else {
         "docker.io/library/python:3.12-bookworm"
