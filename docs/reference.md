@@ -2,6 +2,8 @@
 
 Start with the [project README](../README.md) for installation and an overview.
 
+For automatic registration, use `airgap setup --yes`. The [setup guide](setup.md) covers CLI dispatch, editor detection, credential storage, routing rules and doctor. The manual JSON examples below remain available as an alternative.
+
 A Rust MCP server that sends explicitly supplied files and commands to disposable GMI AgentBox sandboxes. It also provides local secret redaction, manifest inspection, and model-assisted defensive review through GMI MaaS. It never executes submitted commands on your computer.
 
 The name describes the intended host boundary. GMI sandboxes have outbound internet, so this is not a physically air-gapped or offline system. Files sent to a sandbox or inference model leave your machine. Provider isolation, network policy, account permissions, and image trust remain part of the security boundary.

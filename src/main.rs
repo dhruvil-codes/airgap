@@ -1,7 +1,23 @@
-use airgap::{config::Config, tools::Airgap};
+use airgap::{config::Config, doctor, setup, tools::Airgap};
 use rmcp::{transport::io::stdio_pipes, ServiceExt};
 
 fn main() -> anyhow::Result<()> {
+    let args: Vec<_> = std::env::args().skip(1).collect();
+    match args.first().map(String::as_str) {
+        Some("init" | "setup") => return setup::run(&args[1..]),
+        Some("doctor") if args.len() == 1 => return doctor::run(),
+        Some("--help" | "-h" | "help") if args.len() == 1 => {
+            println!("airgap {}\n\nUsage: airgap [--mcp]\n       airgap init|setup [options]\n       airgap doctor\n       airgap --version\n\nNo arguments or --mcp: serve MCP JSON-RPC over stdio.\ninit/setup: configure editors and agent routing rules.\ndoctor: check credentials, gateways, model access and editor registration.\n\nRun airgap setup --help for setup options.", env!("CARGO_PKG_VERSION"));
+            return Ok(());
+        }
+        Some("--version" | "-v" | "-V") if args.len() == 1 => {
+            println!("airgap {}", env!("CARGO_PKG_VERSION"));
+            return Ok(());
+        }
+        None => {}
+        Some("--mcp") if args.len() == 1 => {}
+        _ => anyhow::bail!("unknown command or arguments; run airgap --help"),
+    }
     let runtime = tokio::runtime::Builder::new_multi_thread()
         .worker_threads(2)
         .enable_all()

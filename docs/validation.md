@@ -4,6 +4,12 @@ Recorded on 2026-11-17 with Rust 1.99.1 on Windows x86_64 GNU. These results des
 
 ## Automated checks
 
+The setup/init upgrade passed 49 offline tests on Windows, including real stdio sessions in both launch modes, editor merge/idempotency checks, bounded diagnostic mocks, and a PowerShell installer fixture using the real executable. Formatting, locked checks, all-target Clippy with warnings denied, and the release build passed. The resulting Windows GNU executable was 6,173,696 bytes. Linux/macOS installer fixtures run in their native CI jobs; these Windows results do not establish their outcome.
+
+A read-only `airgap doctor` check with the authorized account confirmed MaaS credentials, the configured model, and AgentBox eligibility in about 1.9 seconds. It found no editor registration in the diagnostic directory and returned a nonzero status accordingly. It created no sandbox or inference completion. This does not resolve the patch-verification denial described below.
+
+The following measurements predate the setup/init upgrade:
+
 - `cargo fmt --check`, `cargo check --locked`, and all-target Clippy with warnings denied passed.
 - `cargo test --locked --all-targets` passed 31 tests: 14 provider-mock tests, two real stdio tests, and 15 scanner/configuration/receipt tests.
 - `cargo build --release --locked` produced a stripped native Windows executable.

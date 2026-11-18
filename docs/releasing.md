@@ -18,10 +18,15 @@ It builds these targets:
 | Target | Runner | Archive |
 | --- | --- | --- |
 | `x86_64-unknown-linux-musl` | Ubuntu | `.tar.gz` |
+| `aarch64-unknown-linux-musl` | Ubuntu ARM64 | `.tar.gz` |
 | `x86_64-pc-windows-msvc` | Windows | `.zip` |
+| `aarch64-pc-windows-msvc` | Windows ARM64 | `.zip` |
 | `aarch64-apple-darwin` | macOS | `.tar.gz` |
+| `x86_64-apple-darwin` | macOS Intel | `.tar.gz` |
 
 These are configured build targets, not a claim that every runtime has been tested. Archives contain only the executable and both license texts. Each archive has a separate `.sha256` file. CI and candidate jobs use no GMI keys.
+
+Windows candidates link the C runtime statically to avoid requiring a separate Visual C++ runtime installation. Linux candidates use musl. System libraries supplied by the operating system are still required.
 
 For a local build, install the desired Rust target and linker, then run:
 
@@ -33,6 +38,8 @@ cargo build --release --locked --target x86_64-pc-windows-msvc
 The script reads the version from Cargo metadata. It refuses a mismatched tag or an existing archive. Use an empty output directory for another candidate build. It requires Cargo and PowerShell, plus `tar` and `chmod` for Unix archives on Unix hosts.
 
 ## Verify and publish
+
+The one-line installers use the latest published GitHub release. Workflow artifacts and draft releases alone do not enable installation. Check `--version`, `setup --yes`, and a stdio roundtrip on candidate binaries before publishing.
 
 Download the candidate archives and checksum files from the workflow run. Verify checksums before extracting, and run a harmless MCP initialize/list/local-redaction check on each target machine you claim to support. A hash checks integrity; it is not a signature or an attestation.
 

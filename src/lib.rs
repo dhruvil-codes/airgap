@@ -1,6 +1,8 @@
 pub mod config;
+pub mod doctor;
 pub mod gmi;
 pub mod receipt;
+pub mod setup;
 pub mod tools;
 
 pub const MAX_TEXT_BYTES: usize = 2 * 1024 * 1024;

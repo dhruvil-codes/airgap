@@ -6,6 +6,8 @@ Changes are recorded here before a release. Version 0.1.0 in Cargo.toml identifi
 
 ### Added
 
+- `init`/`setup`, `doctor`, help, version and explicit `--mcp` terminal dispatch.
+- Idempotent editor merges, managed routing rules, checksum-verified installers and x86_64/ARM64 release targets.
 - Seven MCP tools for remote execution, patch verification, injection classification, secret redaction, manifest review, runtime configuration and defensive repository audit.
 - GMI AgentBox and MaaS clients with bounded requests, explicit sandbox lifetimes and awaited cleanup.
 - Environment-file discovery, snapshot validation and unsigned SHA-256 evidence receipts.
