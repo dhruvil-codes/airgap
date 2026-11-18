@@ -48,7 +48,7 @@ try {
         if (($names -join ',') -cne ($expectedNames -join ',')) { throw 'Unexpected archive members' }
         $entry = $zip.GetEntry('airgap.exe')
         if (-not $entry) { throw 'Archive does not contain airgap.exe' }
-        if ($entry.Length -gt 128MB) { throw 'Release executable is unexpectedly large' }
+        if ($entry.Length -gt 256MB) { throw 'Release executable is unexpectedly large' }
         $binaryPath = Join-Path $tempRoot 'airgap.exe'
         $source = $entry.Open()
         $destination = [System.IO.File]::Open($binaryPath, [System.IO.FileMode]::CreateNew)

@@ -447,20 +447,24 @@ pub fn run(args: &[String]) -> Result<()> {
         .into_os_string()
         .into_string()
         .map_err(|_| anyhow::anyhow!("executable path is not UTF-8"))?;
+    println!();
+    println!("\x1b[1;36m  ▄▀█ █ █▀█ █▀▀ ▄▀█ █▀█\x1b[0m");
+    println!("\x1b[1;36m  █▀█ █ █▀▄ █▄█ █▀█ █▀▀\x1b[0m");
+    println!("\x1b[90m  🛡️  airgap setup v{} · GMI AgentBox v2\x1b[0m\n", env!("CARGO_PKG_VERSION"));
     let written = apply(&workspace, home.as_deref(), &options, &config, &command)?;
     for path in &written {
-        println!("Configured {}", path.display());
+        println!("  \x1b[32m[✓]\x1b[0m Configured {}", path.display());
     }
     if written.is_empty() {
-        println!("airgap is already configured; no files changed.");
+        println!("  \x1b[90mairgap is already configured; no files changed.\x1b[0m");
     }
     if !options.rules_only {
         if config.agentbox_key.is_none() || config.maas_key.is_none() {
-            eprintln!("GMI keys were not fully discovered. Set GMI_AGENTBOX_API_KEY and GMI_MAAS_API_KEY, then rerun setup. Existing editor credentials were preserved.");
+            eprintln!("\n  \x1b[33m[!]\x1b[0m GMI keys were not fully discovered. Set GMI_AGENTBOX_API_KEY and GMI_MAAS_API_KEY, then rerun setup. Existing editor credentials were preserved.");
         } else {
-            eprintln!("Credentials are stored in editor configs. Keep those files out of version control; Unix config files are private to your user.");
+            eprintln!("\n  \x1b[90mCredentials are stored in editor configs. Keep those files out of version control; Unix config files are private to your user.\x1b[0m");
         }
     }
-    println!("Reload your client and approve the MCP server if prompted. Routing rules guide the agent; client tool permissions remain authoritative.");
+    println!("\n  Reload your client and approve the MCP server if prompted. Routing rules guide the agent; client tool permissions remain authoritative.\n");
     Ok(())
 }
