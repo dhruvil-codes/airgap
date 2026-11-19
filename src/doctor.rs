@@ -73,7 +73,10 @@ pub fn run() -> Result<()> {
     println!();
     println!("\x1b[1;36m  ▄▀█ █ █▀█ █▀▀ ▄▀█ █▀█\x1b[0m");
     println!("\x1b[1;36m  █▀█ █ █▀▄ █▄█ █▀█ █▀▀\x1b[0m");
-    println!("\x1b[90m  🛡️  airgap doctor v{} · GMI AgentBox v2\x1b[0m\n", env!("CARGO_PKG_VERSION"));
+    println!(
+        "\x1b[90m  🛡️  airgap doctor v{} · GMI AgentBox v2\x1b[0m\n",
+        env!("CARGO_PKG_VERSION")
+    );
     let config = Config::discover()?;
     status(
         config.agentbox_key.is_some(),
@@ -140,7 +143,9 @@ pub fn run() -> Result<()> {
     }
     let ready = report.maas_ok && report.compute_ok && report.model_available && !paths.is_empty();
     if ready {
-        println!("\n\x1b[32m  ── All checks passed. AI code execution safely airgapped. ──\x1b[0m\n");
+        println!(
+            "\n\x1b[32m  ── All checks passed. AI code execution safely airgapped. ──\x1b[0m\n"
+        );
     }
     ensure!(
         ready,

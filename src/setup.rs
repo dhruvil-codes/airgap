@@ -464,7 +464,10 @@ pub fn run(args: &[String]) -> Result<()> {
     println!();
     println!("\x1b[1;36m  ▄▀█ █ █▀█ █▀▀ ▄▀█ █▀█\x1b[0m");
     println!("\x1b[1;36m  █▀█ █ █▀▄ █▄█ █▀█ █▀▀\x1b[0m");
-    println!("\x1b[90m  🛡️  airgap setup v{} · GMI AgentBox v2\x1b[0m\n", env!("CARGO_PKG_VERSION"));
+    println!(
+        "\x1b[90m  🛡️  airgap setup v{} · GMI AgentBox v2\x1b[0m\n",
+        env!("CARGO_PKG_VERSION")
+    );
     let written = apply(&workspace, home.as_deref(), &options, &config, &command)?;
     for path in &written {
         println!("  \x1b[32m[✓]\x1b[0m Configured {}", path.display());

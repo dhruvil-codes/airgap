@@ -191,8 +191,14 @@ fn format_summary(value: &serde_json::Value) -> Option<String> {
         value.get("exit_code").and_then(serde_json::Value::as_i64),
         value.get("duration_ms").and_then(serde_json::Value::as_u64),
     ) {
-        let stdout = value.get("stdout").and_then(serde_json::Value::as_str).unwrap_or("");
-        let stderr = value.get("stderr").and_then(serde_json::Value::as_str).unwrap_or("");
+        let stdout = value
+            .get("stdout")
+            .and_then(serde_json::Value::as_str)
+            .unwrap_or("");
+        let stderr = value
+            .get("stderr")
+            .and_then(serde_json::Value::as_str)
+            .unwrap_or("");
         let passed = exit_code == 0;
         let status_str = if passed { "PASSED" } else { "FAILED" };
         let status_icon = if passed { "✓" } else { "✗" };
@@ -218,7 +224,9 @@ fn format_summary(value: &serde_json::Value) -> Option<String> {
             {
                 out.push_str("💡 Root Cause: Script executed cleanly in offline fallback mode. No external search API keys were passed into the microVM, so zero external queries were dispatched.\n");
             } else if stdout.contains("Results: []") {
-                out.push_str("ℹ️ Command completed cleanly (exit 0) and returned empty results [].\n");
+                out.push_str(
+                    "ℹ️ Command completed cleanly (exit 0) and returned empty results [].\n",
+                );
             } else {
                 out.push_str("✓ Command executed successfully inside the remote microVM.\n");
             }
@@ -227,7 +235,9 @@ fn format_summary(value: &serde_json::Value) -> Option<String> {
                           Root Cause: The requested executable was not found in the container image.\n\
                           Remedy: Ensure the command is installed or use an auto-detected runtime (Node 20, Python 3.12, Rust 1.80).\n");
         } else {
-            out.push_str(&format!("✗ Process terminated with failure exit code {exit_code}.\n"));
+            out.push_str(&format!(
+                "✗ Process terminated with failure exit code {exit_code}.\n"
+            ));
             if stderr.contains("Cannot find module") {
                 out.push_str("Root Cause: A required module or dependency was missing from the uploaded snapshot.\n");
             } else if let Some(last_err) = stderr.lines().rev().find(|l| !l.trim().is_empty()) {
@@ -239,8 +249,14 @@ fn format_summary(value: &serde_json::Value) -> Option<String> {
     }
 
     if let Some(verified) = value.get("verified").and_then(serde_json::Value::as_bool) {
-        let passed_tests = value.get("tests_passed").and_then(serde_json::Value::as_u64).unwrap_or(0);
-        let failed_tests = value.get("tests_failed").and_then(serde_json::Value::as_u64).unwrap_or(0);
+        let passed_tests = value
+            .get("tests_passed")
+            .and_then(serde_json::Value::as_u64)
+            .unwrap_or(0);
+        let failed_tests = value
+            .get("tests_failed")
+            .and_then(serde_json::Value::as_u64)
+            .unwrap_or(0);
         let status_str = if verified { "VERIFIED" } else { "UNVERIFIED" };
         let status_icon = if verified { "✓" } else { "✗" };
 
@@ -261,7 +277,9 @@ fn format_summary(value: &serde_json::Value) -> Option<String> {
         } else {
             out.push_str("✗ Patch verification failed. Test suite failed or zero recognized test assertions observed.\n");
         }
-        out.push_str("🔒 Zero Host Contamination: Clean base snapshot verified in disposable microVM.\n");
+        out.push_str(
+            "🔒 Zero Host Contamination: Clean base snapshot verified in disposable microVM.\n",
+        );
         return Some(out);
     }
 
@@ -271,7 +289,9 @@ fn format_summary(value: &serde_json::Value) -> Option<String> {
         out.push_str("  █▀█ █ █▀▄ █▄█ █▀█ █▀▀\n");
         out.push_str("  🛡️  airgap supply-chain audit  ·  GMI AgentBox v2\n\n");
 
-        let flagged = value.get("flagged_scripts").and_then(serde_json::Value::as_array);
+        let flagged = value
+            .get("flagged_scripts")
+            .and_then(serde_json::Value::as_array);
         let count = flagged.map_or(0, |a| a.len());
         if risk == "low" {
             out.push_str(
@@ -280,7 +300,7 @@ fn format_summary(value: &serde_json::Value) -> Option<String> {
                  │ Manifest: Clean of suspicious lifecycle hooks / git sources │\n\
                  └─────────────────────────────────────────────────────────────┘\n\n\
                  === ROOT CAUSE & ANALYSIS ===\n\
-                 ✓ No malicious preinstall/postinstall hooks detected.\n"
+                 ✓ No malicious preinstall/postinstall hooks detected.\n",
             );
         } else {
             out.push_str(&format!(
@@ -303,7 +323,10 @@ fn format_summary(value: &serde_json::Value) -> Option<String> {
     }
 
     if let Some(is_safe) = value.get("is_safe").and_then(serde_json::Value::as_bool) {
-        let threat = value.get("threat_level").and_then(serde_json::Value::as_str).unwrap_or("unknown");
+        let threat = value
+            .get("threat_level")
+            .and_then(serde_json::Value::as_str)
+            .unwrap_or("unknown");
         let mut out = String::new();
         out.push_str("  ▄▀█ █ █▀█ █▀▀ ▄▀█ █▀█\n");
         out.push_str("  █▀█ █ █▀▄ █▄█ █▀█ █▀▀\n");
@@ -314,7 +337,7 @@ fn format_summary(value: &serde_json::Value) -> Option<String> {
                 "┌─────────────────────────────────────────────────────────────┐\n\
                  │ [✓] Verdict: CLEAN           Threat Level: clean           │\n\
                  │ Status: No indirect injection or jailbreak patterns found   │\n\
-                 └─────────────────────────────────────────────────────────────┘\n"
+                 └─────────────────────────────────────────────────────────────┘\n",
             );
         } else {
             out.push_str(&format!(
