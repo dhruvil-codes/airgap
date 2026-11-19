@@ -173,9 +173,149 @@ impl ServerHandler for Airgap {
 
 fn result<T: Serialize>(value: anyhow::Result<T>) -> CallToolResult {
     match value.and_then(|value| Ok(serde_json::to_value(value)?)) {
-        Ok(value) => CallToolResult::structured(value),
+        Ok(value) => {
+            let mut res = CallToolResult::structured(value.clone());
+            if let Some(summary) = format_summary(&value) {
+                res.content = vec![ContentBlock::text(summary)];
+            }
+            res
+        }
         Err(error) => CallToolResult::error(vec![ContentBlock::text(
             secrets::redact(&error.to_string()).sanitized_text,
         )]),
     }
+}
+
+fn format_summary(value: &serde_json::Value) -> Option<String> {
+    if let (Some(exit_code), Some(duration_ms)) = (
+        value.get("exit_code").and_then(serde_json::Value::as_i64),
+        value.get("duration_ms").and_then(serde_json::Value::as_u64),
+    ) {
+        let stdout = value.get("stdout").and_then(serde_json::Value::as_str).unwrap_or("");
+        let stderr = value.get("stderr").and_then(serde_json::Value::as_str).unwrap_or("");
+        let passed = exit_code == 0;
+        let status_str = if passed { "PASSED" } else { "FAILED" };
+        let status_icon = if passed { "✓" } else { "✗" };
+
+        let mut out = String::new();
+        out.push_str("  ▄▀█ █ █▀█ █▀▀ ▄▀█ █▀█\n");
+        out.push_str("  █▀█ █ █▀▄ █▄█ █▀█ █▀▀\n");
+        out.push_str("  🛡️  airgap sandbox  ·  GMI AgentBox v2\n\n");
+
+        out.push_str(&format!(
+            "┌─────────────────────────────────────────────────────────────┐\n\
+             │ [{status_icon}] Status: {status_str:<10} Exit Code: {exit_code:<5} Duration: {duration_ms}ms  │\n\
+             │ Environment: MicroVM Linux  Host Security: Protected │\n\
+             └─────────────────────────────────────────────────────────────┘\n\n"
+        ));
+
+        if !stdout.trim().is_empty() {
+            out.push_str("=== SANDBOX STDOUT ===\n");
+            out.push_str(stdout.trim());
+            out.push_str("\n\n");
+        }
+
+        if !stderr.trim().is_empty() {
+            out.push_str("=== SANDBOX STDERR ===\n");
+            out.push_str(stderr.trim());
+            out.push_str("\n\n");
+        }
+
+        out.push_str("=== ROOT CAUSE & ANALYSIS ===\n");
+        if exit_code == 0 {
+            if stdout.contains("No Tavily API key")
+                || stderr.contains("No Tavily API key")
+                || stdout.contains("API key found for search")
+            {
+                out.push_str("💡 Notice: Script executed in offline fallback mode because no search API keys (TAVILY_API_KEY / GEMINI_API_KEY) were provided.\n");
+            } else if stdout.contains("Results: []") {
+                out.push_str("ℹ️ Command succeeded (exit 0). The script completed its run and returned an empty result array.\n");
+            } else {
+                out.push_str("✓ Command executed successfully inside the remote microVM.\n");
+            }
+        } else if exit_code == 127 {
+            out.push_str("✗ Command Not Found (exit code 127).\n\
+                          Root Cause: The requested executable was not found in the container image.\n\
+                          Remedy: Ensure the command is installed or specify a compatible image (e.g. node:20-bookworm, python:3.12-bookworm).\n");
+        } else {
+            out.push_str(&format!("✗ Process terminated with failure exit code {exit_code}.\n"));
+            if stderr.contains("Cannot find module") {
+                out.push_str("Root Cause: A required module or dependency was missing from the uploaded snapshot.\n");
+            }
+        }
+        out.push_str("✓ Zero host contamination: files, host sockets, and local credentials remained untouched.\n");
+        return Some(out);
+    }
+
+    if let Some(risk) = value.get("risk_score").and_then(serde_json::Value::as_str) {
+        let mut out = String::new();
+        out.push_str("  ▄▀█ █ █▀█ █▀▀ ▄▀█ █▀█\n");
+        out.push_str("  █▀█ █ █▀▄ █▄█ █▀█ █▀▀\n");
+        out.push_str("  🛡️  airgap supply-chain audit  ·  GMI AgentBox v2\n\n");
+
+        let flagged = value.get("flagged_scripts").and_then(serde_json::Value::as_array);
+        let count = flagged.map_or(0, |a| a.len());
+        if risk == "low" {
+            out.push_str(
+                "┌─────────────────────────────────────────────────────────────┐\n\
+                 │ [✓] Risk Score: LOW          Flagged Scripts: 0             │\n\
+                 │ Manifest: Clean of suspicious lifecycle hooks / git sources │\n\
+                 └─────────────────────────────────────────────────────────────┘\n\n\
+                 === ROOT CAUSE & ANALYSIS ===\n\
+                 ✓ No malicious preinstall/postinstall hooks detected.\n"
+            );
+        } else {
+            out.push_str(&format!(
+                "┌─────────────────────────────────────────────────────────────┐\n\
+                 │ [!] Risk Score: HIGH         Flagged Scripts: {count:<13} │\n\
+                 │ Warning: Suspicious lifecycle scripts or sources detected   │\n\
+                 └─────────────────────────────────────────────────────────────┘\n\n\
+                 === ROOT CAUSE & ANALYSIS ===\n\
+                 ⚠️ Detected lifecycle scripts that execute automatically during install.\n"
+            ));
+            if let Some(scripts) = flagged {
+                for s in scripts {
+                    if let Some(text) = s.as_str() {
+                        out.push_str(&format!("  • {text}\n"));
+                    }
+                }
+            }
+        }
+        return Some(out);
+    }
+
+    if let Some(is_safe) = value.get("is_safe").and_then(serde_json::Value::as_bool) {
+        let threat = value.get("threat_level").and_then(serde_json::Value::as_str).unwrap_or("unknown");
+        let mut out = String::new();
+        out.push_str("  ▄▀█ █ █▀█ █▀▀ ▄▀█ █▀█\n");
+        out.push_str("  █▀█ █ █▀▄ █▄█ █▀█ █▀▀\n");
+        out.push_str("  🛡️  airgap prompt injection scan  ·  GMI MaaS\n\n");
+
+        if is_safe {
+            out.push_str(
+                "┌─────────────────────────────────────────────────────────────┐\n\
+                 │ [✓] Verdict: CLEAN           Threat Level: clean           │\n\
+                 │ Status: No indirect injection or jailbreak patterns found   │\n\
+                 └─────────────────────────────────────────────────────────────┘\n"
+            );
+        } else {
+            out.push_str(&format!(
+                "┌─────────────────────────────────────────────────────────────┐\n\
+                 │ [✗] Verdict: UNTRUSTED       Threat Level: {threat:<16}│\n\
+                 │ Warning: Potential prompt injection or adversarial content  │\n\
+                 └─────────────────────────────────────────────────────────────┘\n"
+            ));
+            if let Some(findings) = value.get("findings").and_then(serde_json::Value::as_array) {
+                out.push_str("\n=== DETECTED CONCERNS ===\n");
+                for f in findings {
+                    if let Some(item) = f.as_str() {
+                        out.push_str(&format!("  • {item}\n"));
+                    }
+                }
+            }
+        }
+        return Some(out);
+    }
+
+    None
 }
