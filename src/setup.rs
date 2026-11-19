@@ -13,7 +13,21 @@ use crate::config::Config;
 
 const BEGIN: &str = "<!-- airgap:begin -->";
 const END: &str = "<!-- airgap:end -->";
-const RULES: &str = "<!-- airgap:begin -->\n# Security Boundary: Airgap Sandbox\nWhen executing build commands, test suites, or running scripts on untrusted code:\n- Do NOT run bash or shell commands directly on the host machine.\n- Call the `airgap_sandbox_run` MCP tool with an explicit file snapshot to isolate execution inside GMI AgentBox.\n- Review stdout, stderr, exit status, and any evidence receipt returned by airgap.\n- If the tool fails, report the failure; do not silently fall back to host execution.\nThese instructions guide tool selection; they do not replace the client's tool permissions.\n<!-- airgap:end -->";
+const RULES: &str = "<!-- airgap:begin -->\n\
+# Security Boundary: Airgap MicroVM Sandbox (GMI AgentBox v2)\n\
+When the user asks to run, test, execute, scrape, build, or verify code (e.g. 'run this script', 'test the scraper', 'verify this patch', 'audit dependencies'):\n\
+- NEVER execute untrusted scripts, test suites, or build commands directly on the host machine.\n\
+- Automatically route execution to the appropriate airgap tool:\n\
+  * Run scripts, scrapers, tests, or builds: call `airgap_sandbox_run` (upload only required files; Node/Python/Rust images are auto-detected)\n\
+  * Verify PRs, diffs, or patches: call `airgap_verify_patch`\n\
+  * Audit manifests (package.json, Cargo.toml, requirements.txt): call `airgap_audit_supply`\n\
+  * Clean credentials/secrets: call `airgap_redact_secrets`\n\
+  * Scan prompt injection: call `airgap_scan_injection`\n\
+  * Deep repository audit: call `airgap_audit_repo`\n\
+- Do NOT require the user to type 'airgap:' or explicit tool names. Interpret everyday developer requests ('run this', 'execute this', 'test this function') as instructions to invoke airgap tools in isolation.\n\
+- If a sandbox run fails, report the root cause from the airgap status card. Do NOT silently fall back to host execution.\n\
+These instructions guide tool selection; client tool permissions remain authoritative.\n\
+<!-- airgap:end -->";
 
 pub const HELP: &str = "Usage: airgap init|setup [--yes|-y] [--cursor] [--claude] [--vscode] [--rules-only]\n\nWithout editor flags, detect editors; prepare all three if none are detected.\nSelected editors receive workspace configuration and Cursor/Claude user configuration.\n--rules-only updates only workspace .cursorrules and CLAUDE.md.\nDiscovered keys are stored in editor configuration files. Never commit those files.\n";
 
