@@ -33,9 +33,9 @@ All files are preflighted before writes. Malformed JSON, invalid object shapes, 
 
 ## Credentials
 
-`Config::discover()` resolves process environment and trusted `.env` / `cloudvet.env` files in the current directory and four parents. Process values win. Dedicated compute and inference keys fall back to `GMI_API_KEY`.
+`Config::discover()` resolves process environment and trusted `.env` / `cloudvet.env` files in the current directory and four parents. Process values win. Provider base URLs are accepted only from the process environment. Dedicated compute and inference keys fall back to `GMI_API_KEY`.
 
-Discovered keys are stored in plaintext in selected editor `env` objects. Setup prints paths and statuses, never key values. Unix config files written by setup use mode 0600; Windows files inherit directory ACLs. Keep workspace MCP config files out of Git and review diffs before committing. Setup does not stage files or modify ignore rules. Only run it in a trusted workspace.
+Discovered keys are stored in plaintext only in user-level editor configs (`~/.claude.json`, `~/.cursor/mcp.json`). Workspace files (`.mcp.json`, `.cursor/mcp.json`, `.vscode/mcp.json`) never receive keys, and setup removes keys it finds there. VS Code has no user-level file in setup, so supply keys through the process environment or a `.env` file. Setup prints paths and statuses, never key values. Unix config files written by setup use mode 0600; Windows files inherit directory ACLs. Review diffs before committing. Setup does not stage files or modify ignore rules. Only run it in a trusted workspace.
 
 Non-default model, region and provider URLs are carried into editor configuration. Missing keys produce a warning; set them and rerun setup when available. Local redaction and manifest scanning need no keys.
 
@@ -43,7 +43,7 @@ Non-default model, region and provider URLs are carried into editor configuratio
 
 Setup manages a delimited block in `.cursorrules` and `CLAUDE.md`. VS Code setup also updates `.github/copilot-instructions.md`. Text outside that block is preserved. Incomplete or duplicate blocks fail preflight.
 
-`--rules-only` changes only `.cursorrules` and `CLAUDE.md`, without reading editor configuration or discovering keys. Instructions ask agents to supply explicit snapshots, use `airgap_sandbox_run`, review output, and report failures instead of silently falling back to host execution.
+`--rules-only` changes only `.cursorrules` and `CLAUDE.md`, without reading editor configuration or discovering keys. Instructions tell agents that "use airgap", or any request to run, test, build or verify code, means they should pick and sequence the Airgap tools themselves: scan external issue or PR text with `airgap_scan_injection`, audit manifests with `airgap_audit_supply` before installing, run commands with `airgap_sandbox_run` on explicit snapshots, verify diffs with `airgap_verify_patch`, and redact logs and diffs with `airgap_redact_secrets`. Failures are reported instead of silently falling back to host execution.
 
 Rules cannot disable other tools, approve a server or guarantee agent behavior. Configure client permissions if remote-only execution is required.
 

@@ -83,6 +83,8 @@ pub async fn audit(
         .into_iter()
         .map(|(path, text)| (path, super::secrets::redact(&text).sanitized_text))
         .collect();
+    // Every model phase sends the full snapshot; reject it before paying for the inventory sandbox.
+    crate::check_text(&serde_json::to_string(&files)?)?;
     // A fixed inventory command is the only audit execution; model text is never executed.
     let inventory = agentbox
         .run(

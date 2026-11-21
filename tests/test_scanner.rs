@@ -29,6 +29,54 @@ fn redacts_credentials_without_exposing_values_or_double_counting() {
 }
 
 #[test]
+fn settings_with_sensitive_substrings_are_not_redacted() {
+    for input in [
+        "max_tokens = 4096",
+        "tokenizer: gpt2",
+        "MAX_TOKENS=4096",
+        "retries_token_bucket: 3",
+    ] {
+        let result = redact(input);
+        assert_eq!(result.sanitized_text, input);
+        assert_eq!(result.redacted_items_count, 0);
+    }
+}
+
+#[test]
+fn short_passwords_are_redacted_but_short_settings_are_not() {
+    assert_eq!(
+        redact(r#"password = "hunter2""#).sanitized_text,
+        r#"password = "[REDACTED]""#
+    );
+    assert_eq!(redact("passwd: admin").sanitized_text, "passwd: [REDACTED]");
+    for input in ["max_tokens = 4096", "MAX_TOKENS=4096", "tokenizer: gpt2"] {
+        assert_eq!(redact(input).sanitized_text, input);
+    }
+}
+
+#[test]
+fn delimited_and_camel_case_credential_keys_are_redacted() {
+    let github = format!("ghp_{}", "a1B2".repeat(9));
+    for (input, secret) in [
+        (format!("GITHUB_TOKEN = \"{github}\""), github.as_str()),
+        ("api_key: secret12345".into(), "secret12345"),
+        ("x-api-key=abcdefgh1".into(), "abcdefgh1"),
+        ("accessToken: 'opaque-value'".into(), "opaque-value"),
+        (
+            "AWS_SECRET_ACCESS_KEY=wJalrXUtnFEMI".into(),
+            "wJalrXUtnFEMI",
+        ),
+    ] {
+        let result = redact(&input);
+        assert!(
+            !result.sanitized_text.contains(secret),
+            "{input} -> {}",
+            result.sanitized_text
+        );
+    }
+}
+
+#[test]
 fn private_keys_are_redacted_including_incomplete_keys() {
     for input in ["before\n-----BEGIN OPENSSH PRIVATE KEY-----\nabc123\n-----END OPENSSH PRIVATE KEY-----\nafter", "-----BEGIN RSA PRIVATE KEY-----\ntruncated"] {
         let result = redact(input);
@@ -186,6 +234,31 @@ fn config_discovery_precedence_and_credential_fallback() {
     assert_eq!(config.model, "child-model");
     assert_eq!(config.agentbox_key.as_deref(), Some("parent"));
     assert_eq!(config.maas_key.as_deref(), Some("inference"));
+}
+
+#[test]
+fn dotenv_cannot_override_provider_base_urls() {
+    let temp = tempfile::tempdir().unwrap();
+    std::fs::write(
+        temp.path().join(".env"),
+        "GMI_AGENTBOX_BASE_URL=https://attacker.example/agents\nGMI_MAAS_BASE_URL=https://attacker.example/v1\nGMI_MODEL=dotenv-model\n",
+    )
+    .unwrap();
+    let environment = BTreeMap::from([("GMI_API_KEY".into(), "process-key".into())]);
+    let config = Config::load(temp.path(), environment).unwrap();
+    assert_eq!(
+        config.agentbox_base_url,
+        airgap::config::DEFAULT_AGENTBOX_BASE_URL
+    );
+    assert_eq!(config.maas_base_url, airgap::config::DEFAULT_MAAS_BASE_URL);
+    assert_eq!(config.model, "dotenv-model");
+
+    let environment = BTreeMap::from([(
+        "GMI_MAAS_BASE_URL".into(),
+        "https://proxy.example/v1".into(),
+    )]);
+    let config = Config::load(temp.path(), environment).unwrap();
+    assert_eq!(config.maas_base_url, "https://proxy.example/v1");
 }
 
 #[test]

@@ -73,6 +73,9 @@ impl Client {
     async fn initialize(&mut self) {
         let response = self.request(1, "initialize", json!({"protocolVersion":"2025-03-26", "capabilities":{}, "clientInfo":{"name":"airgap-test","version":"1"}})).await;
         assert_eq!(response["result"]["serverInfo"]["name"], "airgap");
+        let instructions = response["result"]["instructions"].as_str().unwrap();
+        assert!(instructions.starts_with("MANDATORY AIRGAP AGENT ORCHESTRATION RULES:"));
+        assert!(instructions.contains("'use airgap'"));
         self.send(json!({"jsonrpc":"2.0", "method":"notifications/initialized"}))
             .await;
     }
@@ -114,9 +117,17 @@ async fn initialize_discover_and_call_over_real_stdio() {
         "airgap_configure",
         "airgap_audit_repo",
     ] {
-        assert!(tools
-            .iter()
-            .any(|tool| tool["name"] == name && tool["inputSchema"].is_object()));
+        let tool = tools.iter().find(|tool| tool["name"] == name).unwrap();
+        assert!(tool["inputSchema"].is_object());
+        if name != "airgap_configure" {
+            assert!(
+                tool["description"]
+                    .as_str()
+                    .unwrap()
+                    .contains("TRIGGER AUTOMATICALLY"),
+                "{name} lacks a trigger description"
+            );
+        }
     }
     let response = client.request(3, "tools/call", json!({"name":"airgap_redact_secrets", "arguments":{"raw_text":"API_KEY=example-secret"}})).await;
     assert_eq!(

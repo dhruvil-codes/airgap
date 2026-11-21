@@ -17,12 +17,19 @@ Changes are recorded here before a release. Version 0.1.0 in Cargo.toml identifi
 ### Changed
 
 - MCP tool text output for sandbox runs, patch verification, supply-chain audit, secret redaction and injection scans is compact Markdown (verdict, duration, environment and host-protection note) instead of ASCII banners and box frames. `structuredContent` is unchanged; ASCII art remains only in terminal commands.
+- Autonomous agent routing rules and trigger descriptions guide coding agents to sequence tools automatically upon request ("use airgap", "run tests", "fix issue"), with autonomous fallback to `airgap_sandbox_run` when patch verification returns a provider error.
 
 ### Fixed
 
-- Clean injection results require an empty threat findings array; the prompt no longer asks for reassuring explanations in that array.
-- Repository audit instructions distinguish concrete security impact from ordinary type and length hardening advice.
-- Provider errors identify the operation without including resource identifiers or raw response bodies.
+- Base URLs (`GMI_AGENTBOX_BASE_URL`, `GMI_MAAS_BASE_URL`) are read exclusively from process environment variables; repository `.env` values are ignored to prevent malicious repos from exfiltrating credentials.
+- Workspace configuration files (`.mcp.json`, `.cursor/mcp.json`, `.vscode/mcp.json`) no longer receive API keys during setup; keys are restricted to user-level configs (`~/.claude.json`, `~/.cursor/mcp.json`).
+- Untrusted text in `airgap_scan_injection` is scrubbed with the local secret redactor before uploading to GMI MaaS.
+- Secret redaction avoids false positives on configuration parameters like `max_tokens = 4096` and `tokenizer: gpt2` by enforcing boundary delimiters on key names and skipping short or digit-only values for general keys.
+- Explicit `password` and `passwd` keys are always redacted regardless of length, preserving coverage for short passwords while leaving harmless numeric settings untouched.
+- Sandbox summary verdict requires provider `passed == true` and `exit_code == 0`, preventing false "PASSED" reports on timed-out or cancelled runs.
+- Repository audit verifies that serialized snapshot size is within the 2 MiB limit before starting any billable AgentBox inventory microVM.
+- AgentBox cleanup deletes tasks and deployment templates independently; successful execution outputs are retained with a `cleanup_warning` if remote teardown fails.
+- Verify summary reports both zero passed and nonzero failed test counts concurrently.
 
 ### Known limitations
 

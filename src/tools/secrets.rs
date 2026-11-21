@@ -26,10 +26,18 @@ static PATTERNS: LazyLock<Vec<Regex>> = LazyLock::new(|| {
 ].into_iter().map(|pattern| Regex::new(pattern).expect("static regex")).collect()
 });
 
+// A sensitive keyword must be a whole segment of the key name: delimited by `_`/`-`
+// (`GITHUB_TOKEN`, `x-api-key`) or a camelCase hump (`accessToken`, `secretKey`).
+// `max_tokens` and `tokenizer` therefore do not match.
 static ASSIGNMENT: LazyLock<Regex> = LazyLock::new(|| {
-    Regex::new(
-    r#"(?im)["']?\b[a-z0-9_-]*(?:api[_-]?key|access[_-]?key|secret|token|password|passwd|credential|authorization)[a-z0-9_-]*["']?[ \t]*[:=][ \t]*(?:bearer[ \t]+)?(?:"(?P<double>(?:\\.|[^"\\\r\n])*)(?:"|$)|'(?P<single>(?:\\.|[^'\\\r\n])*)(?:'|$)|(?P<plain>[^\s,;#}\r\n]+))"#
-).expect("static regex")
+    Regex::new(concat!(
+        r#"(?m)["']?\b(?P<key>(?:"#,
+        r"(?:[A-Za-z0-9]+[_-])*(?i:api[_-]?key|access[_-]?key|secret|token|password|passwd|credentials?|authorization)",
+        r"|[A-Za-z0-9]*[a-z0-9](?:Api_?Key|Access_?Key|Secret|Token|Password|Passwd|Credentials?|Authorization)",
+        r")(?:[_-][A-Za-z0-9]+|[A-Z][a-z0-9]+)*)\b",
+        r#"["']?[ \t]*[:=][ \t]*(?i:bearer[ \t]+)?(?:"(?P<double>(?:\\.|[^"\\\r\n])*)(?:"|$)|'(?P<single>(?:\\.|[^'\\\r\n])*)(?:'|$)|(?P<plain>[^\s,;#}\r\n]+))"#,
+    ))
+    .expect("static regex")
 });
 
 static BEARER: LazyLock<Regex> = LazyLock::new(|| {
@@ -67,7 +75,16 @@ pub fn redact(text: &str) -> Redaction {
             .or_else(|| captures.name("single"))
             .or_else(|| captures.name("plain"))
         {
-            if !value.is_empty() {
+            let text = value.as_str();
+            let key = captures["key"].to_ascii_lowercase();
+            // Passwords are often short, so any value counts. For other keys, short or
+            // numeric values are settings (`retries_token_bucket = 3`), not credentials.
+            let sensitive = if key.contains("password") || key.contains("passwd") {
+                !text.is_empty()
+            } else {
+                text.len() >= 8 && !text.bytes().all(|b| b.is_ascii_digit())
+            };
+            if sensitive {
                 spans.push((value.start(), value.end()));
             }
         }

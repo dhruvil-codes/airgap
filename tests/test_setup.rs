@@ -44,11 +44,16 @@ fn test_setup_cursor_merge() {
     assert_eq!(value["mcpServers"]["other"]["command"], "keep");
     assert_eq!(value["mcpServers"]["airgap"]["custom"], true);
     assert_eq!(value["mcpServers"]["airgap"]["env"]["KEEP"], "value");
+    // Workspace-level config must NOT contain API keys!
+    assert!(value["mcpServers"]["airgap"]["env"]
+        .get("GMI_MAAS_API_KEY")
+        .is_none());
+    assert!(home.path().join(".cursor/mcp.json").is_file());
+    let home_value = read(home.path().join(".cursor/mcp.json"));
     assert_eq!(
-        value["mcpServers"]["airgap"]["env"]["GMI_MAAS_API_KEY"],
+        home_value["mcpServers"]["airgap"]["env"]["GMI_MAAS_API_KEY"],
         "synthetic-inference"
     );
-    assert!(home.path().join(".cursor/mcp.json").is_file());
     assert!(!temp.path().join(".mcp.json").exists());
 }
 
@@ -72,6 +77,7 @@ fn test_setup_claude_merge() {
     let project = read(temp.path().join(".mcp.json"));
     assert_eq!(project["mcpServers"]["airgap"]["command"], "airgap");
     assert_eq!(project["mcpServers"]["airgap"]["args"], json!(["--mcp"]));
+    assert!(project["mcpServers"]["airgap"].get("env").is_none());
     assert_eq!(
         read(home.path().join(".claude.json"))["hasCompletedOnboarding"],
         true
@@ -79,6 +85,10 @@ fn test_setup_claude_merge() {
     assert_eq!(
         read(home.path().join(".claude.json"))["mcpServers"]["existing"]["command"],
         "keep"
+    );
+    assert_eq!(
+        read(home.path().join(".claude.json"))["mcpServers"]["airgap"]["env"]["GMI_MAAS_API_KEY"],
+        "synthetic-inference"
     );
 }
 
@@ -138,7 +148,7 @@ fn vscode_preserves_inputs_and_other_servers_and_adds_portable_config() {
 fn missing_keys_do_not_erase_existing_editor_credentials() {
     let config = Config::from_values(BTreeMap::new()).unwrap();
     let old = json!({"mcpServers":{"airgap":{"env":{"GMI_MAAS_API_KEY":"existing"}}}});
-    let new = setup::merge_config(old, "mcpServers", &config, "airgap").unwrap();
+    let new = setup::merge_config(old, "mcpServers", &config, "airgap", true).unwrap();
     assert_eq!(
         new["mcpServers"]["airgap"]["env"]["GMI_MAAS_API_KEY"],
         "existing"
@@ -148,7 +158,7 @@ fn missing_keys_do_not_erase_existing_editor_credentials() {
 #[test]
 fn stale_remote_transport_does_not_override_the_installed_stdio_command() {
     let old = json!({"mcpServers":{"airgap":{"url":"https://example.invalid","headers":{"Authorization":"synthetic"},"custom":true}}});
-    let new = setup::merge_config(old, "mcpServers", &config(), "airgap").unwrap();
+    let new = setup::merge_config(old, "mcpServers", &config(), "airgap", true).unwrap();
     let server = &new["mcpServers"]["airgap"];
     assert!(server.get("url").is_none() && server.get("headers").is_none());
     assert_eq!(server["command"], "airgap");
@@ -188,6 +198,23 @@ fn routing_rules_preserve_existing_text_and_replace_only_the_managed_block() {
 }
 
 #[test]
+fn routing_rules_trigger_on_use_airgap_and_run_requests() {
+    let rules = setup::merge_rules("").unwrap();
+    assert!(rules.contains("'use airgap'"));
+    assert!(rules.contains("without waiting for explicit tool names"));
+    for tool in [
+        "airgap_scan_injection",
+        "airgap_audit_supply",
+        "airgap_sandbox_run",
+        "airgap_verify_patch",
+        "airgap_redact_secrets",
+        "airgap_audit_repo",
+    ] {
+        assert!(rules.contains(tool), "{tool} missing from routing rules");
+    }
+}
+
+#[test]
 fn rules_only_does_not_read_or_change_editor_configs() {
     let temp = tempfile::tempdir().unwrap();
     fs::write(temp.path().join(".mcp.json"), "invalid config").unwrap();
@@ -212,7 +239,7 @@ fn invalid_server_shapes_are_rejected_without_discarding_values() {
         json!({"mcpServers":{"airgap":[]}}),
         json!({"mcpServers":{"airgap":{"env":null}}}),
     ] {
-        assert!(setup::merge_config(value, "mcpServers", &config(), "airgap").is_err());
+        assert!(setup::merge_config(value, "mcpServers", &config(), "airgap", true).is_err());
     }
     assert!(Options::parse(&["--unknown".into()]).is_err());
 }
@@ -270,6 +297,29 @@ fn credential_files_are_private_and_symlinks_are_refused() {
         "airgap"
     )
     .is_err());
+}
+
+#[test]
+fn workspace_config_does_not_contain_api_keys() {
+    let old = json!({"mcpServers":{"airgap":{"env":{"KEEP":"true","GMI_MAAS_API_KEY":"old"}}}});
+    let workspace_merged =
+        setup::merge_config(old.clone(), "mcpServers", &config(), "airgap", false).unwrap();
+    let server = &workspace_merged["mcpServers"]["airgap"];
+    assert_eq!(server["command"], "airgap");
+    assert_eq!(server["env"]["KEEP"], "true");
+    assert!(server["env"].get("GMI_MAAS_API_KEY").is_none());
+    assert!(server["env"].get("GMI_AGENTBOX_API_KEY").is_none());
+
+    let user_merged = setup::merge_config(old, "mcpServers", &config(), "airgap", true).unwrap();
+    let user_server = &user_merged["mcpServers"]["airgap"];
+    assert_eq!(
+        user_server["env"]["GMI_MAAS_API_KEY"],
+        "synthetic-inference"
+    );
+    assert_eq!(
+        user_server["env"]["GMI_AGENTBOX_API_KEY"],
+        "synthetic-compute"
+    );
 }
 
 #[cfg(unix)]

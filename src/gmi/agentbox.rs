@@ -40,6 +40,8 @@ pub struct ExecutionResult {
     pub passed: bool,
     pub stdout_truncated: bool,
     pub stderr_truncated: bool,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub cleanup_warning: Option<String>,
 }
 
 impl AgentBox {
@@ -225,13 +227,19 @@ impl AgentBox {
             self.cleanup(sandbox.as_deref(), slug.as_deref()),
         )
         .await;
-        match (result, cleanup) {
-            (Ok(mut result), Ok(Ok(()))) => {
+        let cleanup_failed = !matches!(cleanup, Ok(Ok(())));
+        const CLEANUP_WARNING: &str =
+            "remote cleanup failed; inspect AgentBox resources (sandbox lifetime is bounded)";
+        match result {
+            Ok(mut result) => {
                 result.duration_ms = start.elapsed().as_millis() as u64;
+                if cleanup_failed {
+                    result.cleanup_warning = Some(CLEANUP_WARNING.into());
+                }
                 Ok(result)
             }
-            (Err(error), Ok(Ok(()))) => Err(error),
-            (_, _) => bail!("sandbox job ended but remote cleanup failed; inspect AgentBox resources (sandbox lifetime is bounded)"),
+            Err(error) if cleanup_failed => Err(error.context(CLEANUP_WARNING)),
+            Err(error) => Err(error),
         }
     }
 
@@ -328,6 +336,7 @@ impl AgentBox {
                             .get("stderr_truncated")
                             .and_then(Value::as_bool)
                             .unwrap_or(false),
+                        cleanup_warning: None,
                     });
                 }
                 tokio::time::sleep(Duration::from_millis(250)).await;
@@ -369,13 +378,16 @@ impl AgentBox {
     }
 
     async fn cleanup(&self, sandbox: Option<&str>, slug: Option<&str>) -> Result<()> {
-        if let Some(id) = sandbox {
-            self.delete(&format!("/tasks/{id}")).await?;
-        }
-        if let Some(slug) = slug {
-            self.delete(&format!("/deployments/{slug}")).await?;
-        }
-        Ok(())
+        // Each resource is deleted independently so one failure cannot leak the other.
+        let task = match sandbox {
+            Some(id) => self.delete(&format!("/tasks/{id}")).await,
+            None => Ok(()),
+        };
+        let deployment = match slug {
+            Some(slug) => self.delete(&format!("/deployments/{slug}")).await,
+            None => Ok(()),
+        };
+        task.and(deployment)
     }
 
     async fn delete(&self, path: &str) -> Result<()> {

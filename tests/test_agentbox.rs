@@ -37,6 +37,10 @@ fn config(server: &MockServer) -> Arc<Config> {
 }
 
 async fn lifecycle(server: &MockServer) {
+    lifecycle_with_task_delete(server, 204).await;
+}
+
+async fn lifecycle_with_task_delete(server: &MockServer, task_delete_status: u16) {
     Mock::given(method("POST"))
         .and(path("/deployments"))
         .and(header("authorization", "Bearer test-compute-key"))
@@ -71,7 +75,7 @@ async fn lifecycle(server: &MockServer) {
         .await;
     Mock::given(method("DELETE"))
         .and(path("/tasks/test-box"))
-        .respond_with(ResponseTemplate::new(204))
+        .respond_with(ResponseTemplate::new(task_delete_status))
         .expect(1)
         .mount(server)
         .await;
@@ -184,6 +188,35 @@ async fn timeout_cancels_execution_and_cleans_both_resources() {
     let agent = AgentBox::new(http_client().unwrap(), config(&server));
     let result = agent.run("sleep 100".into(), Files::new(), None, 1).await;
     assert!(result.unwrap_err().to_string().contains("deadline"));
+    agent.shutdown().await;
+}
+
+#[tokio::test]
+async fn failed_cleanup_keeps_result_and_still_deletes_template() {
+    let server = MockServer::start().await;
+    // 403 is not retried, so the task deletion fails once; the template must still be deleted.
+    lifecycle_with_task_delete(&server, 403).await;
+    executions(&server, 0, "ok", false).await;
+    let agent = AgentBox::new(http_client().unwrap(), config(&server));
+    let output = agent
+        .run("true".into(), Files::new(), None, 10)
+        .await
+        .unwrap();
+    assert!(output.passed);
+    assert_eq!(output.stdout, "ok");
+    assert!(output
+        .cleanup_warning
+        .as_deref()
+        .is_some_and(|warning| warning.contains("remote cleanup failed")));
+    let deletions: Vec<_> = server
+        .received_requests()
+        .await
+        .unwrap()
+        .iter()
+        .filter(|r| r.method.as_str() == "DELETE")
+        .map(|r| r.url.path().to_owned())
+        .collect();
+    assert_eq!(deletions, ["/tasks/test-box", "/deployments/test-agent"]);
     agent.shutdown().await;
 }
 
@@ -393,6 +426,60 @@ async fn injection_cannot_be_marked_safe_with_a_malicious_verdict() {
         .as_str()
         .unwrap()
         .contains("untrusted_content"));
+}
+
+#[tokio::test]
+async fn injection_scan_redacts_secrets_before_upload() {
+    let server = MockServer::start().await;
+    let content = json!({"is_safe":true,"threat_level":"clean","findings":[]}).to_string();
+    Mock::given(method("POST"))
+        .and(path("/chat/completions"))
+        .respond_with(ResponseTemplate::new(200).set_body_json(
+            json!({"choices":[{"finish_reason":"stop","message":{"content":content}}]}),
+        ))
+        .expect(1)
+        .mount(&server)
+        .await;
+    let maas = Maas::new(http_client().unwrap(), config(&server));
+    scan(
+        &maas,
+        "model",
+        10,
+        InjectionRequest {
+            text_content: "Build fails.\nAPI_KEY=synthetic-issue-secret".into(),
+            source_label: None,
+        },
+    )
+    .await
+    .unwrap();
+    let requests = server.received_requests().await.unwrap();
+    let body = String::from_utf8_lossy(&requests[0].body).into_owned();
+    assert!(!body.contains("synthetic-issue-secret"));
+    assert!(body.contains("Build fails."));
+}
+
+#[tokio::test]
+async fn oversized_audit_snapshot_fails_before_any_billable_call() {
+    let server = MockServer::start().await;
+    let cfg = config(&server);
+    let agent = AgentBox::new(http_client().unwrap(), cfg.clone());
+    let maas = Maas::new(http_client().unwrap(), cfg);
+    let error = audit::audit(
+        &agent,
+        &maas,
+        "model",
+        10,
+        AuditRequest {
+            files: Files::from([("big.txt".into(), "a".repeat(3 * 1024 * 1024))]),
+            image: None,
+        },
+    )
+    .await
+    .err()
+    .unwrap();
+    assert!(error.to_string().contains("2 MiB"));
+    assert!(server.received_requests().await.unwrap().is_empty());
+    agent.shutdown().await;
 }
 
 #[tokio::test]

@@ -3,6 +3,9 @@ use std::{collections::BTreeMap, path::Path};
 use anyhow::{ensure, Context, Result};
 
 pub const DEFAULT_MODEL: &str = "deepseek-ai/DeepSeek-V4.1-Flash";
+pub const DEFAULT_AGENTBOX_BASE_URL: &str = "https://api.gmi-serving.com/v1/agents";
+pub const DEFAULT_MAAS_BASE_URL: &str = "https://api.gmi-serving.com/v1";
+pub const DEFAULT_IDC: &str = "us-central-iowa16";
 
 // Do not derive Debug: this structure holds credentials.
 #[derive(Clone)]
@@ -35,6 +38,11 @@ impl Config {
                     // Never include parse errors: dotenv errors can contain credential values.
                     let (key, value) =
                         entry.map_err(|_| anyhow::anyhow!("invalid environment file syntax"))?;
+                    // Critical security: never allow repository .env files to override provider base URLs.
+                    // Doing so would allow hostile repositories to steal GMI API keys by pointing URLs to an attacker.
+                    if key == "GMI_AGENTBOX_BASE_URL" || key == "GMI_MAAS_BASE_URL" {
+                        continue;
+                    }
                     values.entry(key).or_insert(value);
                 }
             }
@@ -49,14 +57,14 @@ impl Config {
             agentbox_key: get("GMI_AGENTBOX_API_KEY").or_else(|| get("GMI_API_KEY")),
             maas_key: get("GMI_MAAS_API_KEY").or_else(|| get("GMI_API_KEY")),
             agentbox_base_url: get("GMI_AGENTBOX_BASE_URL")
-                .unwrap_or_else(|| "https://api.gmi-serving.com/v1/agents".into())
+                .unwrap_or_else(|| DEFAULT_AGENTBOX_BASE_URL.into())
                 .trim_end_matches('/')
                 .into(),
             maas_base_url: get("GMI_MAAS_BASE_URL")
-                .unwrap_or_else(|| "https://api.gmi-serving.com/v1".into())
+                .unwrap_or_else(|| DEFAULT_MAAS_BASE_URL.into())
                 .trim_end_matches('/')
                 .into(),
-            idc: get("GMI_DEFAULT_IDC").unwrap_or_else(|| "us-central-iowa16".into()),
+            idc: get("GMI_DEFAULT_IDC").unwrap_or_else(|| DEFAULT_IDC.into()),
             model: get("GMI_MODEL").unwrap_or_else(|| DEFAULT_MODEL.into()),
             timeout_seconds: 120,
         };

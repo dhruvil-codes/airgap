@@ -91,7 +91,7 @@ Repository audit uses six phases: recon, control inventory, candidate identifica
 
 ## Configuration
 
-The loader searches the current directory and four parents. In each directory it reads `.env` before `cloudvet.env`. The closest file wins, with the process environment taking precedence over all files. It parses values without executing shell commands or changing the process environment. Start from a trusted directory because environment files control credentials, models and provider destinations.
+The loader searches the current directory and four parents. In each directory it reads `.env` before `cloudvet.env`. The closest file wins, with the process environment taking precedence over all files. It parses values without executing shell commands or changing the process environment. `GMI_AGENTBOX_BASE_URL` and `GMI_MAAS_BASE_URL` are read only from the process environment; values in environment files are ignored so a cloned repository cannot redirect credentials. Start from a trusted directory because environment files still control credentials and models.
 
 | Variable | Default / meaning |
 | --- | --- |
