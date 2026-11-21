@@ -123,6 +123,20 @@ async fn initialize_discover_and_call_over_real_stdio() {
         response["result"]["structuredContent"]["sanitized_text"],
         "API_KEY=[REDACTED]"
     );
+    let summary = response["result"]["content"][0]["text"].as_str().unwrap();
+    assert!(summary.starts_with("🛡️ **Airgap Secret Redactor** · ⏱️ **"));
+    assert!(summary.ends_with("🔒 **1 Secret Redacted**\n\n> API_KEY=[REDACTED]"));
+    assert!(!summary.contains("▄▀█") && !summary.contains('┌'));
+    let response = client.request(6, "tools/call", json!({"name":"airgap_audit_supply", "arguments":{"manifest_type":"npm", "manifest_content":"{\"scripts\":{\"postinstall\":\"node x.js\"}}"}})).await;
+    assert_eq!(
+        response["result"]["structuredContent"]["risk_score"],
+        "high"
+    );
+    let summary = response["result"]["content"][0]["text"].as_str().unwrap();
+    assert!(summary.starts_with("🛡️ **Airgap Supply-Chain Audit** · ⏱️ **"));
+    assert!(summary.contains(
+        "🚨 **Risk Level: HIGH** (1 flagged item)\n\n- npm script postinstall: node x.js"
+    ));
     let response = client
         .request(
             4,

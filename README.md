@@ -3,6 +3,7 @@
 [![CI](https://github.com/dhruvil-codes/airgap/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/dhruvil-codes/airgap/actions/workflows/ci.yml)
 [![Rust](https://img.shields.io/badge/Rust-1.89%2B-orange?logo=rust)](https://www.rust-lang.org/tools/install)
 [![License](https://img.shields.io/badge/license-MIT%20OR%20Apache--2.0-blue)](#license)
+[![M8ven Trust Score](https://m8ven.ai/api/mcp/badge?repo=dhruvil-codes/airgap)](https://m8ven.ai/mcp/dhruvil-codes/airgap)
 
 **Remote execution and defensive security tools for AI coding agents.**
 

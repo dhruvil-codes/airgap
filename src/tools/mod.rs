@@ -5,7 +5,10 @@ pub mod sandbox;
 pub mod secrets;
 pub mod supply;
 
-use std::sync::{Arc, RwLock};
+use std::{
+    sync::{Arc, RwLock},
+    time::Instant,
+};
 
 use rmcp::{
     handler::server::{router::tool::ToolRouter, wrapper::Parameters},
@@ -16,7 +19,10 @@ use serde::Serialize;
 
 use crate::{
     config::Config,
-    gmi::{agentbox::AgentBox, maas::Maas},
+    gmi::{
+        agentbox::{detect_image, AgentBox},
+        maas::Maas,
+    },
 };
 use config_tool::{ConfigureRequest, RuntimeConfig};
 
@@ -65,16 +71,24 @@ impl Airgap {
         &self,
         Parameters(request): Parameters<sandbox::SandboxRequest>,
     ) -> CallToolResult {
+        let started = Instant::now();
         let settings = self.settings();
-        result(
+        let files = request.files.unwrap_or_default();
+        let environment = request
+            .image
+            .clone()
+            .unwrap_or_else(|| detect_image(&files).into());
+        summarized(
             self.agentbox
                 .run(
                     request.command,
-                    request.files.unwrap_or_default(),
+                    files,
                     request.image,
                     request.timeout_secs.unwrap_or(settings.timeout_seconds),
                 )
                 .await,
+            Summary::Sandbox { environment },
+            started,
         )
     }
 
@@ -85,7 +99,12 @@ impl Airgap {
         &self,
         Parameters(request): Parameters<sandbox::VerifyRequest>,
     ) -> CallToolResult {
-        result(sandbox::verify(&self.agentbox, request, self.settings().timeout_seconds).await)
+        let started = Instant::now();
+        summarized(
+            sandbox::verify(&self.agentbox, request, self.settings().timeout_seconds).await,
+            Summary::Verify,
+            started,
+        )
     }
 
     #[tool(
@@ -95,8 +114,9 @@ impl Airgap {
         &self,
         Parameters(request): Parameters<injection::InjectionRequest>,
     ) -> CallToolResult {
+        let started = Instant::now();
         let settings = self.settings();
-        result(
+        summarized(
             injection::scan(
                 &self.maas,
                 &settings.model,
@@ -104,6 +124,8 @@ impl Airgap {
                 request,
             )
             .await,
+            Summary::Injection,
+            started,
         )
     }
 
@@ -114,7 +136,12 @@ impl Airgap {
         &self,
         Parameters(request): Parameters<secrets::RedactRequest>,
     ) -> CallToolResult {
-        result(crate::check_text(&request.raw_text).map(|_| secrets::redact(&request.raw_text)))
+        let started = Instant::now();
+        summarized(
+            crate::check_text(&request.raw_text).map(|_| secrets::redact(&request.raw_text)),
+            Summary::Redact,
+            started,
+        )
     }
 
     #[tool(
@@ -124,7 +151,8 @@ impl Airgap {
         &self,
         Parameters(request): Parameters<supply::SupplyRequest>,
     ) -> CallToolResult {
-        result(supply::audit(request))
+        let started = Instant::now();
+        summarized(supply::audit(request), Summary::Supply, started)
     }
 
     #[tool(
@@ -171,12 +199,38 @@ impl ServerHandler for Airgap {
     }
 }
 
+enum Summary {
+    Sandbox { environment: String },
+    Verify,
+    Supply,
+    Redact,
+    Injection,
+}
+
 fn result<T: Serialize>(value: anyhow::Result<T>) -> CallToolResult {
+    respond(value, None)
+}
+
+fn summarized<T: Serialize>(
+    value: anyhow::Result<T>,
+    summary: Summary,
+    started: Instant,
+) -> CallToolResult {
+    let elapsed_ms = u64::try_from(started.elapsed().as_millis()).unwrap_or(u64::MAX);
+    respond(value, Some((summary, elapsed_ms)))
+}
+
+fn respond<T: Serialize>(
+    value: anyhow::Result<T>,
+    summary: Option<(Summary, u64)>,
+) -> CallToolResult {
     match value.and_then(|value| Ok(serde_json::to_value(value)?)) {
         Ok(value) => {
             let mut res = CallToolResult::structured(value.clone());
-            if let Some(summary) = format_summary(&value) {
-                res.content = vec![ContentBlock::text(summary)];
+            if let Some((summary, elapsed_ms)) = summary {
+                res.content = vec![ContentBlock::text(format_summary(
+                    &summary, &value, elapsed_ms,
+                ))];
             }
             res
         }
@@ -186,177 +240,389 @@ fn result<T: Serialize>(value: anyhow::Result<T>) -> CallToolResult {
     }
 }
 
-fn format_summary(value: &serde_json::Value) -> Option<String> {
-    if let (Some(exit_code), Some(duration_ms)) = (
-        value.get("exit_code").and_then(serde_json::Value::as_i64),
-        value.get("duration_ms").and_then(serde_json::Value::as_u64),
-    ) {
-        let stdout = value
-            .get("stdout")
-            .and_then(serde_json::Value::as_str)
-            .unwrap_or("");
-        let stderr = value
-            .get("stderr")
-            .and_then(serde_json::Value::as_str)
-            .unwrap_or("");
-        let passed = exit_code == 0;
-        let status_str = if passed { "PASSED" } else { "FAILED" };
-        let status_icon = if passed { "✓" } else { "✗" };
+fn format_summary(summary: &Summary, value: &serde_json::Value, elapsed_ms: u64) -> String {
+    match summary {
+        Summary::Sandbox { environment } => sandbox_summary(environment, value, elapsed_ms),
+        Summary::Verify => verify_summary(value, elapsed_ms),
+        Summary::Supply => supply_summary(value, elapsed_ms),
+        Summary::Redact => redact_summary(value, elapsed_ms),
+        Summary::Injection => injection_summary(value, elapsed_ms),
+    }
+}
 
-        let mut out = String::new();
-        out.push_str("  ▄▀█ █ █▀█ █▀▀ ▄▀█ █▀█\n");
-        out.push_str("  █▀█ █ █▀▄ █▄█ █▀█ █▀▀\n");
-        out.push_str("  🛡️  airgap sandbox  ·  GMI AgentBox v2\n\n");
+fn sandbox_summary(environment: &str, value: &serde_json::Value, elapsed_ms: u64) -> String {
+    let exit_code = value["exit_code"].as_i64().unwrap_or(-1);
+    let duration_ms = value["duration_ms"].as_u64().unwrap_or(elapsed_ms);
+    let stdout = text_field(value, "stdout");
+    let stderr = text_field(value, "stderr");
+    let passed = exit_code == 0;
+    let (icon, status) = if passed {
+        ("✅", "PASSED")
+    } else {
+        ("❌", "FAILED")
+    };
 
+    let mut out = format!(
+        "🛡️ **Airgap Sandbox** · {} · ⏱️ **{duration_ms}ms**\n\
+         {icon} **Status: {status}** (Exit Code: {exit_code})\n\n",
+        inline_code(environment)
+    );
+    if passed {
+        out.push_str(&output_block(stdout, value["stdout_truncated"].as_bool()));
+    } else {
+        let (output, truncated) = if stderr.trim().is_empty() {
+            (stdout, value["stdout_truncated"].as_bool())
+        } else {
+            (stderr, value["stderr_truncated"].as_bool())
+        };
+        out.push_str(&output_block(output, truncated));
         out.push_str(&format!(
-            "┌─────────────────────────────────────────────────────────────┐\n\
-             │ [{status_icon}] Status: {status_str:<10} Exit Code: {exit_code:<5} Duration: {duration_ms}ms  │\n\
-             │ Environment: MicroVM Linux  Host Security: Protected │\n\
-             └─────────────────────────────────────────────────────────────┘\n\n"
+            "\n\n💡 **Remedy:** {}",
+            sandbox_remedy(exit_code, output)
         ));
+    }
+    out.push_str(
+        "\n\n🔒 *Host Protected: Executed inside isolated GMI AgentBox MicroVM. Zero local modifications.*",
+    );
+    out
+}
 
-        out.push_str("=== ROOT CAUSE & ANALYSIS ===\n");
-        if exit_code == 0 {
-            if stdout.contains("No Tavily API key")
-                || stderr.contains("No Tavily API key")
-                || stdout.contains("API key found for search")
-                || stderr.contains("API key found for search")
-            {
-                out.push_str("💡 Root Cause: Script executed cleanly in offline fallback mode. No external search API keys were passed into the microVM, so zero external queries were dispatched.\n");
-            } else if stdout.contains("Results: []") {
-                out.push_str(
-                    "ℹ️ Command completed cleanly (exit 0) and returned empty results [].\n",
-                );
+fn sandbox_remedy(exit_code: i64, output: &str) -> String {
+    let lower = output.to_ascii_lowercase();
+    match exit_code {
+        127 => "Executable not found in container image. Install it in the command or pass an `image` that provides it.".into(),
+        126 => "Command found but not executable. Check file permissions or invoke it through its interpreter.".into(),
+        124 | 137 => "Process was killed, usually by the timeout or memory limit. Raise `timeout_secs` or reduce the workload.".into(),
+        _ if lower.contains("cannot find module")
+            || lower.contains("no module named")
+            || lower.contains("unresolved import") =>
+        {
+            "A dependency is missing from the sandbox. Install it in the command or upload the manifest and sources it needs.".into()
+        }
+        _ => match last_line(output) {
+            Some(line) => format!("Fix the reported error and re-run: {}", inline_code(line)),
+            None => "The command failed without output. Re-run with verbose flags to see the cause.".into(),
+        },
+    }
+}
+
+fn verify_summary(value: &serde_json::Value, elapsed_ms: u64) -> String {
+    let verified = value["verified"].as_bool().unwrap_or(false);
+    let execution = &value["execution"];
+    let duration_ms = execution["duration_ms"].as_u64().unwrap_or(elapsed_ms);
+    let passed = value["tests_passed"].as_u64();
+    let failed = value["tests_failed"].as_u64();
+    let (icon, verdict) = if verified {
+        ("✅", "VERIFIED")
+    } else {
+        ("❌", "UNVERIFIED")
+    };
+    let tests = match (passed, failed) {
+        (Some(passed), Some(failed)) => {
+            format!("**{passed} passed**, **{failed} failed**")
+        }
+        _ => "**no recognized test summary**".into(),
+    };
+
+    let mut out = format!(
+        "🛡️ **Airgap Patch Verification** · ⏱️ **{duration_ms}ms**\n\
+         {icon} **Verdict: {verdict}** · Tests: {tests}\n\n"
+    );
+    if verified {
+        out.push_str("Patch applied cleanly to the base snapshot and the test suite passed.");
+    } else {
+        let mut reasons = Vec::new();
+        if value["command_passed"].as_bool() == Some(false) {
+            let exit_code = execution["exit_code"].as_i64().unwrap_or(-1);
+            reasons.push(format!(
+                "Patch apply or test command failed (exit code {exit_code})."
+            ));
+        }
+        if execution["stdout_truncated"].as_bool() == Some(true)
+            || execution["stderr_truncated"].as_bool() == Some(true)
+        {
+            reasons.push("Output was truncated, so the test summary cannot be trusted.".into());
+        }
+        match (passed, failed) {
+            (None, _) | (_, None) => {
+                reasons.push("No recognized Rust or pytest test summary in the output.".into())
+            }
+            (Some(0), _) => reasons.push("No passing tests were observed.".into()),
+            (_, Some(failed)) if failed > 0 => reasons.push(format!("{failed} test(s) failed.")),
+            _ => {}
+        }
+        for reason in reasons {
+            out.push_str(&format!("- {reason}\n"));
+        }
+        let stderr = text_field(execution, "stderr");
+        let output = if stderr.trim().is_empty() {
+            text_field(execution, "stdout")
+        } else {
+            stderr
+        };
+        let tail = tail_lines(output, 20);
+        if !tail.is_empty() {
+            out.push('\n');
+            out.push_str(&code_block(&tail));
+        }
+        let trimmed = out.trim_end().len();
+        out.truncate(trimmed);
+    }
+    out.push_str(
+        "\n\n🔒 *Zero Host Contamination: Clean base snapshot verified in disposable cloud sandbox.*",
+    );
+    out
+}
+
+fn supply_summary(value: &serde_json::Value, elapsed_ms: u64) -> String {
+    let flagged: Vec<&str> = value["flagged_scripts"]
+        .as_array()
+        .map(|items| items.iter().filter_map(serde_json::Value::as_str).collect())
+        .unwrap_or_default();
+    let count = flagged.len();
+    // Flags that run code at install or build time outrank flags that only point at
+    // an alternate dependency source.
+    let executes_code = flagged.iter().any(|flag| {
+        flag.starts_with("npm script ")
+            || flag.contains("build script")
+            || flag.contains("execute at build time")
+    });
+    let (icon, level) = if value["risk_score"].as_str() == Some("low") || count == 0 {
+        ("✅", "CLEAN")
+    } else if executes_code {
+        ("🚨", "HIGH")
+    } else {
+        ("⚠️", "MEDIUM")
+    };
+    let noun = if count == 1 { "item" } else { "items" };
+
+    let mut out = format!(
+        "🛡️ **Airgap Supply-Chain Audit** · ⏱️ **{elapsed_ms}ms**\n\
+         {icon} **Risk Level: {level}** ({count} flagged {noun})\n\n"
+    );
+    if flagged.is_empty() {
+        out.push_str("- No install-time scripts or alternate dependency sources found. Manifest heuristics only; not an advisory scan.");
+    } else {
+        let bullets: Vec<String> = flagged.iter().map(|flag| format!("- {flag}")).collect();
+        out.push_str(&bullets.join("\n"));
+    }
+    out.push_str("\n\n🔒 *Manifest heuristics evaluated. Local host protected.*");
+    out
+}
+
+fn redact_summary(value: &serde_json::Value, elapsed_ms: u64) -> String {
+    let count = value["redacted_items_count"].as_u64().unwrap_or(0);
+    let noun = if count == 1 { "Secret" } else { "Secrets" };
+    format!(
+        "🛡️ **Airgap Secret Redactor** · ⏱️ **{elapsed_ms}ms**\n\
+         🔒 **{count} {noun} Redacted**\n\n{}",
+        blockquote(text_field(value, "sanitized_text"))
+    )
+}
+
+fn injection_summary(value: &serde_json::Value, elapsed_ms: u64) -> String {
+    // The classifier returns a threat level, not a score; the score is a fixed display
+    // mapping of that level so agents can compare results at a glance.
+    let (icon, verdict, score) = match value["threat_level"].as_str() {
+        Some("clean") if value["is_safe"].as_bool() == Some(true) => ("✅", "SAFE", 0),
+        Some("malicious") => ("🚨", "MALICIOUS", 100),
+        _ => ("⚠️", "SUSPICIOUS", 50),
+    };
+    let findings: Vec<&str> = value["findings"]
+        .as_array()
+        .map(|items| items.iter().filter_map(serde_json::Value::as_str).collect())
+        .unwrap_or_default();
+    let rationale = if findings.is_empty() {
+        "No indirect prompt injection or jailbreak patterns detected.".to_string()
+    } else {
+        findings
+            .iter()
+            .map(|finding| format!("- {finding}"))
+            .collect::<Vec<_>>()
+            .join("\n")
+    };
+    format!(
+        "🛡️ **Airgap Prompt Defense** · ⏱️ **{elapsed_ms}ms**\n\
+         {icon} **Verdict: {verdict}** (Risk Score: {score}/100)\n\n{}",
+        blockquote(&rationale)
+    )
+}
+
+fn text_field<'a>(value: &'a serde_json::Value, key: &str) -> &'a str {
+    value[key].as_str().unwrap_or("")
+}
+
+fn last_line(text: &str) -> Option<&str> {
+    text.lines()
+        .rev()
+        .map(str::trim)
+        .find(|line| !line.is_empty())
+}
+
+fn tail_lines(text: &str, count: usize) -> String {
+    let lines: Vec<&str> = text.trim_end().lines().collect();
+    lines[lines.len().saturating_sub(count)..].join("\n")
+}
+
+fn output_block(text: &str, truncated: Option<bool>) -> String {
+    let mut out = if text.trim().is_empty() {
+        "_No output._".to_string()
+    } else {
+        code_block(text)
+    };
+    if truncated == Some(true) {
+        out.push_str("\n_Output truncated._");
+    }
+    out
+}
+
+/// Fences with one more backtick than the longest run inside `text`, so command
+/// output containing backticks cannot close the block early.
+fn code_block(text: &str) -> String {
+    let longest = text
+        .split(|c: char| c != '`')
+        .map(str::len)
+        .max()
+        .unwrap_or(0);
+    let fence = "`".repeat(longest.max(2) + 1);
+    format!("{fence}\n{}\n{fence}", text.trim_end_matches(['\r', '\n']))
+}
+
+fn inline_code(text: &str) -> String {
+    format!("`{}`", text.replace('`', "'"))
+}
+
+fn blockquote(text: &str) -> String {
+    if text.is_empty() {
+        return ">".into();
+    }
+    text.lines()
+        .map(|line| {
+            if line.is_empty() {
+                ">".to_string()
             } else {
-                out.push_str("✓ Command executed successfully inside the remote microVM.\n");
+                format!("> {line}")
             }
-        } else if exit_code == 127 {
-            out.push_str("✗ Command Not Found (exit code 127).\n\
-                          Root Cause: The requested executable was not found in the container image.\n\
-                          Remedy: Ensure the command is installed or use an auto-detected runtime (Node 20, Python 3.12, Rust 1.80).\n");
-        } else {
-            out.push_str(&format!(
-                "✗ Process terminated with failure exit code {exit_code}.\n"
-            ));
-            if stderr.contains("Cannot find module") {
-                out.push_str("Root Cause: A required module or dependency was missing from the uploaded snapshot.\n");
-            } else if let Some(last_err) = stderr.lines().rev().find(|l| !l.trim().is_empty()) {
-                out.push_str(&format!("Root Cause: {}\n", last_err.trim()));
-            }
+        })
+        .collect::<Vec<_>>()
+        .join("\n")
+}
+
+#[cfg(test)]
+mod tests {
+    use serde_json::json;
+
+    use super::*;
+
+    const LEGACY: [&str; 4] = ["▄▀█", "┌", "│", "└"];
+
+    fn assert_clean(out: &str) {
+        for legacy in LEGACY {
+            assert!(!out.contains(legacy), "legacy art {legacy:?} in:\n{out}");
         }
-        out.push_str("🔒 Zero Host Contamination: 100% Protected. Local files, sockets, and host credentials remained untouched.\n");
-        return Some(out);
     }
 
-    if let Some(verified) = value.get("verified").and_then(serde_json::Value::as_bool) {
-        let passed_tests = value
-            .get("tests_passed")
-            .and_then(serde_json::Value::as_u64)
-            .unwrap_or(0);
-        let failed_tests = value
-            .get("tests_failed")
-            .and_then(serde_json::Value::as_u64)
-            .unwrap_or(0);
-        let status_str = if verified { "VERIFIED" } else { "UNVERIFIED" };
-        let status_icon = if verified { "✓" } else { "✗" };
-
-        let mut out = String::new();
-        out.push_str("  ▄▀█ █ █▀█ █▀▀ ▄▀█ █▀█\n");
-        out.push_str("  █▀█ █ █▀▄ █▄█ █▀█ █▀▀\n");
-        out.push_str("  🛡️  airgap patch verify  ·  GMI AgentBox v2\n\n");
-
-        out.push_str(&format!(
-            "┌─────────────────────────────────────────────────────────────┐\n\
-             │ [{status_icon}] Verdict: {status_str:<10} Passed: {passed_tests:<6} Failed: {failed_tests:<8} │\n\
-             │ Environment: MicroVM Linux  Host Security: Protected │\n\
-             └─────────────────────────────────────────────────────────────┘\n\n\
-             === ROOT CAUSE & ANALYSIS ===\n"
-        ));
-        if verified {
-            out.push_str(&format!("✓ Unified diff applied cleanly and test suite passed ({passed_tests} tests passed).\n"));
-        } else {
-            out.push_str("✗ Patch verification failed. Test suite failed or zero recognized test assertions observed.\n");
-        }
-        out.push_str(
-            "🔒 Zero Host Contamination: Clean base snapshot verified in disposable microVM.\n",
+    #[test]
+    fn sandbox_pass_shows_stdout_in_fence() {
+        let value = json!({"exit_code":0,"stdout":"hello\n","stderr":"","duration_ms":42,"passed":true,"stdout_truncated":false,"stderr_truncated":false});
+        let out = format_summary(
+            &Summary::Sandbox {
+                environment: "docker.io/library/python:3.12-bookworm".into(),
+            },
+            &value,
+            9,
         );
-        return Some(out);
+        assert_clean(&out);
+        assert!(out.starts_with("🛡️ **Airgap Sandbox** · `docker.io/library/python:3.12-bookworm` · ⏱️ **42ms**\n✅ **Status: PASSED** (Exit Code: 0)\n\n```\nhello\n```\n\n🔒 *Host Protected:"), "{out}");
     }
 
-    if let Some(risk) = value.get("risk_score").and_then(serde_json::Value::as_str) {
-        let mut out = String::new();
-        out.push_str("  ▄▀█ █ █▀█ █▀▀ ▄▀█ █▀█\n");
-        out.push_str("  █▀█ █ █▀▄ █▄█ █▀█ █▀▀\n");
-        out.push_str("  🛡️  airgap supply-chain audit  ·  GMI AgentBox v2\n\n");
-
-        let flagged = value
-            .get("flagged_scripts")
-            .and_then(serde_json::Value::as_array);
-        let count = flagged.map_or(0, |a| a.len());
-        if risk == "low" {
-            out.push_str(
-                "┌─────────────────────────────────────────────────────────────┐\n\
-                 │ [✓] Risk Score: LOW          Flagged Scripts: 0             │\n\
-                 │ Manifest: Clean of suspicious lifecycle hooks / git sources │\n\
-                 └─────────────────────────────────────────────────────────────┘\n\n\
-                 === ROOT CAUSE & ANALYSIS ===\n\
-                 ✓ No malicious preinstall/postinstall hooks detected.\n",
-            );
-        } else {
-            out.push_str(&format!(
-                "┌─────────────────────────────────────────────────────────────┐\n\
-                 │ [!] Risk Score: HIGH         Flagged Scripts: {count:<13} │\n\
-                 │ Warning: Suspicious lifecycle scripts or sources detected   │\n\
-                 └─────────────────────────────────────────────────────────────┘\n\n\
-                 === ROOT CAUSE & ANALYSIS ===\n\
-                 ⚠️ Detected lifecycle scripts that execute automatically during install.\n"
-            ));
-            if let Some(scripts) = flagged {
-                for s in scripts {
-                    if let Some(text) = s.as_str() {
-                        out.push_str(&format!("  • {text}\n"));
-                    }
-                }
-            }
-        }
-        return Some(out);
+    #[test]
+    fn sandbox_failure_shows_stderr_and_remedy() {
+        let value = json!({"exit_code":127,"stdout":"","stderr":"sh: 1: foo: not found\n","duration_ms":7,"passed":false,"stdout_truncated":false,"stderr_truncated":false});
+        let out = format_summary(
+            &Summary::Sandbox {
+                environment: "img".into(),
+            },
+            &value,
+            1,
+        );
+        assert_clean(&out);
+        assert!(
+            out.contains("❌ **Status: FAILED** (Exit Code: 127)"),
+            "{out}"
+        );
+        assert!(out.contains("```\nsh: 1: foo: not found\n```"), "{out}");
+        assert!(
+            out.contains("Executable not found in container image"),
+            "{out}"
+        );
     }
 
-    if let Some(is_safe) = value.get("is_safe").and_then(serde_json::Value::as_bool) {
-        let threat = value
-            .get("threat_level")
-            .and_then(serde_json::Value::as_str)
-            .unwrap_or("unknown");
-        let mut out = String::new();
-        out.push_str("  ▄▀█ █ █▀█ █▀▀ ▄▀█ █▀█\n");
-        out.push_str("  █▀█ █ █▀▄ █▄█ █▀█ █▀▀\n");
-        out.push_str("  🛡️  airgap prompt injection scan  ·  GMI MaaS\n\n");
-
-        if is_safe {
-            out.push_str(
-                "┌─────────────────────────────────────────────────────────────┐\n\
-                 │ [✓] Verdict: CLEAN           Threat Level: clean           │\n\
-                 │ Status: No indirect injection or jailbreak patterns found   │\n\
-                 └─────────────────────────────────────────────────────────────┘\n",
-            );
-        } else {
-            out.push_str(&format!(
-                "┌─────────────────────────────────────────────────────────────┐\n\
-                 │ [✗] Verdict: UNTRUSTED       Threat Level: {threat:<16}│\n\
-                 │ Warning: Potential prompt injection or adversarial content  │\n\
-                 └─────────────────────────────────────────────────────────────┘\n"
-            ));
-            if let Some(findings) = value.get("findings").and_then(serde_json::Value::as_array) {
-                out.push_str("\n=== DETECTED CONCERNS ===\n");
-                for f in findings {
-                    if let Some(item) = f.as_str() {
-                        out.push_str(&format!("  • {item}\n"));
-                    }
-                }
-            }
-        }
-        return Some(out);
+    #[test]
+    fn fence_outgrows_backticks_in_output() {
+        assert_eq!(code_block("a ```` b"), "`````\na ```` b\n`````");
     }
 
-    None
+    #[test]
+    fn verify_reports_counts_and_failure_reasons() {
+        let ok = json!({"verified":true,"command_passed":true,"tests_passed":3,"tests_failed":0,"execution":{"exit_code":0,"stdout":"","stderr":"","duration_ms":120,"stdout_truncated":false,"stderr_truncated":false}});
+        let out = format_summary(&Summary::Verify, &ok, 5);
+        assert_clean(&out);
+        assert!(out.starts_with("🛡️ **Airgap Patch Verification** · ⏱️ **120ms**\n✅ **Verdict: VERIFIED** · Tests: **3 passed**, **0 failed**"), "{out}");
+        assert!(out.ends_with("🔒 *Zero Host Contamination: Clean base snapshot verified in disposable cloud sandbox.*"));
+
+        let bad = json!({"verified":false,"command_passed":false,"tests_passed":null,"tests_failed":null,"execution":{"exit_code":1,"stdout":"","stderr":"error: patch failed","duration_ms":80,"stdout_truncated":false,"stderr_truncated":false}});
+        let out = format_summary(&Summary::Verify, &bad, 5);
+        assert!(
+            out.contains("❌ **Verdict: UNVERIFIED** · Tests: **no recognized test summary**"),
+            "{out}"
+        );
+        assert!(
+            out.contains("- Patch apply or test command failed (exit code 1)."),
+            "{out}"
+        );
+        assert!(out.contains("```\nerror: patch failed\n```"), "{out}");
+    }
+
+    #[test]
+    fn supply_levels() {
+        let clean = json!({"risk_score":"low","flagged_scripts":[]});
+        let out = format_summary(&Summary::Supply, &clean, 0);
+        assert_clean(&out);
+        assert!(out.starts_with("🛡️ **Airgap Supply-Chain Audit** · ⏱️ **0ms**\n✅ **Risk Level: CLEAN** (0 flagged items)"), "{out}");
+
+        let medium = json!({"risk_score":"high","flagged_scripts":["dependencies/x: remote or local dependency requires review"]});
+        let out = format_summary(&Summary::Supply, &medium, 0);
+        assert!(
+            out.contains("⚠️ **Risk Level: MEDIUM** (1 flagged item)"),
+            "{out}"
+        );
+        assert!(out.contains("\n- dependencies/x: remote"), "{out}");
+
+        let high = json!({"risk_score":"high","flagged_scripts":["npm script postinstall: node x.js","dependencies/x: remote"]});
+        let out = format_summary(&Summary::Supply, &high, 0);
+        assert!(
+            out.contains("🚨 **Risk Level: HIGH** (2 flagged items)"),
+            "{out}"
+        );
+    }
+
+    #[test]
+    fn redact_quotes_every_line() {
+        let value = json!({"sanitized_text":"API_KEY=[REDACTED]\n\nnext","redacted_items_count":1});
+        let out = format_summary(&Summary::Redact, &value, 3);
+        assert_eq!(out, "🛡️ **Airgap Secret Redactor** · ⏱️ **3ms**\n🔒 **1 Secret Redacted**\n\n> API_KEY=[REDACTED]\n>\n> next");
+    }
+
+    #[test]
+    fn injection_verdicts() {
+        let safe = json!({"is_safe":true,"threat_level":"clean","findings":[]});
+        let out = format_summary(&Summary::Injection, &safe, 4);
+        assert_clean(&out);
+        assert!(out.starts_with("🛡️ **Airgap Prompt Defense** · ⏱️ **4ms**\n✅ **Verdict: SAFE** (Risk Score: 0/100)\n\n> No indirect"), "{out}");
+
+        let bad = json!({"is_safe":false,"threat_level":"malicious","findings":["Hidden instruction to access credentials"]});
+        let out = format_summary(&Summary::Injection, &bad, 4);
+        assert!(out.contains("🚨 **Verdict: MALICIOUS** (Risk Score: 100/100)\n\n> - Hidden instruction to access credentials"), "{out}");
+    }
 }

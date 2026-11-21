@@ -14,6 +14,10 @@ Changes are recorded here before a release. Version 0.1.0 in Cargo.toml identifi
 - Offline regression tests, real stdio protocol checks and documented live smoke-check results.
 - Contributor guidance, security policy, GitHub issue and PR templates, cross-platform CI and release-candidate packaging.
 
+### Changed
+
+- MCP tool text output for sandbox runs, patch verification, supply-chain audit, secret redaction and injection scans is compact Markdown (verdict, duration, environment and host-protection note) instead of ASCII banners and box frames. `structuredContent` is unchanged; ASCII art remains only in terminal commands.
+
 ### Fixed
 
 - Clean injection results require an empty threat findings array; the prompt no longer asks for reassuring explanations in that array.
