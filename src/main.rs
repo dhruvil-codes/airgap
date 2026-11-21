@@ -5,10 +5,20 @@ fn main() -> anyhow::Result<()> {
     let args: Vec<_> = std::env::args().skip(1).collect();
     match args.first().map(String::as_str) {
         Some("init" | "setup") => return setup::run(&args[1..]),
-        Some("doctor") if args.len() == 1 => return doctor::run(),
+        Some("doctor")
+            if args[1..]
+                .iter()
+                .all(|arg| arg == "--verbose" || arg == "-v") =>
+        {
+            return doctor::run(
+                args[1..]
+                    .iter()
+                    .any(|arg| arg == "--verbose" || arg == "-v"),
+            );
+        }
         Some("--help" | "-h" | "help") if args.len() == 1 => {
-            let banner = airgap::banner(concat!("v", env!("CARGO_PKG_VERSION")));
-            println!("{banner}\nUsage: airgap [--mcp]\n       airgap init|setup [options]\n       airgap doctor\n       airgap --version\n\nNo arguments or --mcp: serve MCP JSON-RPC over stdio.\ninit/setup: configure editors and agent routing rules.\ndoctor: check credentials, gateways, model access and editor registration.\n\nRun airgap setup --help for setup options.");
+            let banner = airgap::banner("security boundary for AI coding agents");
+            println!("{banner}\nUsage: airgap [--mcp]\n       airgap init|setup [options]\n       airgap doctor [--verbose|-v]\n       airgap --version\n\nNo arguments or --mcp: serve MCP JSON-RPC over stdio.\ninit/setup: configure editors and agent routing rules.\ndoctor: check credentials, gateways, model access and editor registration.\n\nRun airgap setup --help for setup options.");
             return Ok(());
         }
         Some("--version" | "-v" | "-V") if args.len() == 1 => {

@@ -61,39 +61,74 @@ pub async fn check(config: &Config, client: &Client) -> Report {
     }
 }
 
-fn status(ok: bool, label: &str, message: &str) {
-    if ok {
-        println!("  \x1b[32m[✓]\x1b[0m \x1b[1m{label:<18}\x1b[0m \x1b[90m{message}\x1b[0m");
+struct Check {
+    ok: bool,
+    label: String,
+    detail: String,
+    remedy: &'static str,
+}
+
+fn check_line(check: &Check) {
+    if check.ok {
+        println!(
+            "  \x1b[32m✓\x1b[0m \x1b[1m{:<18}\x1b[0m \x1b[90m{}\x1b[0m",
+            check.label, check.detail
+        );
     } else {
-        println!("  \x1b[31m[✗]\x1b[0m \x1b[1m{label:<18}\x1b[0m \x1b[31m{message}\x1b[0m");
+        println!(
+            "  \x1b[31m✗\x1b[0m \x1b[1;31m{:<18}\x1b[0m \x1b[31m{}\x1b[0m",
+            check.label, check.detail
+        );
+        println!("    \x1b[33m→ {}\x1b[0m", check.remedy);
     }
 }
 
-pub fn run() -> Result<()> {
-    println!();
-    println!(
-        "{}",
-        crate::banner(concat!("doctor v", env!("CARGO_PKG_VERSION")))
-    );
+const SPINNER: [char; 10] = ['⠋', '⠙', '⠹', '⠸', '⠼', '⠴', '⠦', '⠧', '⠇', '⠏'];
+
+async fn check_with_spinner(config: &Config, client: &Client) -> Report {
+    use std::io::{IsTerminal, Write};
+
+    let mut stderr = std::io::stderr();
+    if !stderr.is_terminal() {
+        return check(config, client).await;
+    }
+    let work = check(config, client);
+    tokio::pin!(work);
+    let mut tick = tokio::time::interval(Duration::from_millis(80));
+    let mut frame = 0;
+    let report = loop {
+        tokio::select! {
+            report = &mut work => break report,
+            _ = tick.tick() => {
+                let _ = write!(
+                    stderr,
+                    "\r\x1b[2K  \x1b[36m{}\x1b[0m Diagnosing GMI gateways, compute & editor configs...",
+                    SPINNER[frame % SPINNER.len()]
+                );
+                let _ = stderr.flush();
+                frame += 1;
+            }
+        }
+    };
+    let _ = write!(stderr, "\r\x1b[2K");
+    let _ = stderr.flush();
+    report
+}
+
+fn client_names(paths: &[(&'static str, std::path::PathBuf)]) -> Vec<&'static str> {
+    let mut names = Vec::new();
+    for (label, _) in paths {
+        let name = label.split(" (").next().unwrap_or(label);
+        if !names.contains(&name) {
+            names.push(name);
+        }
+    }
+    names
+}
+
+pub fn run(verbose: bool) -> Result<()> {
+    println!("{}", crate::banner("doctor"));
     let config = Config::discover()?;
-    status(
-        config.agentbox_key.is_some(),
-        "AgentBox key",
-        if config.agentbox_key.is_some() {
-            "present; checking compute eligibility"
-        } else {
-            "missing: set GMI_AGENTBOX_API_KEY"
-        },
-    );
-    status(
-        config.maas_key.is_some(),
-        "MaaS key",
-        if config.maas_key.is_some() {
-            "present; checking model access"
-        } else {
-            "missing: set GMI_MAAS_API_KEY"
-        },
-    );
     let client = Client::builder()
         .redirect(reqwest::redirect::Policy::none())
         .no_proxy()
@@ -103,49 +138,113 @@ pub fn run() -> Result<()> {
     let runtime = tokio::runtime::Builder::new_current_thread()
         .enable_all()
         .build()?;
-    let report = runtime.block_on(check(&config, &client));
-    status(
-        report.maas_ok,
-        "MaaS gateway",
-        if report.maas_ok {
-            "connected; credential accepted"
-        } else {
-            "unreachable, rejected, or invalid response"
-        },
-    );
-    status(
-        report.compute_ok,
-        "AgentBox",
-        if report.compute_ok {
-            "compute eligibility confirmed"
-        } else {
-            "compute access not confirmed"
-        },
-    );
-    status(
-        report.model_available,
-        "Configured model",
-        if report.model_available {
-            "available in model catalog"
-        } else {
-            "not confirmed in model catalog"
-        },
-    );
+    let report = runtime.block_on(check_with_spinner(&config, &client));
     let workspace = std::env::current_dir()?;
     let paths = setup::configured_paths(&workspace, setup::home_dir().as_deref());
-    for (label, path) in &paths {
-        status(true, label, &path.display().to_string());
-    }
+    let model = config.model.rsplit('/').next().unwrap_or(&config.model);
+
+    let mut checks = vec![
+        Check {
+            ok: config.agentbox_key.is_some(),
+            label: "AgentBox key".into(),
+            detail: if config.agentbox_key.is_some() {
+                "present"
+            } else {
+                "missing"
+            }
+            .into(),
+            remedy: "set GMI_AGENTBOX_API_KEY, then run airgap setup --yes",
+        },
+        Check {
+            ok: config.maas_key.is_some(),
+            label: "MaaS key".into(),
+            detail: if config.maas_key.is_some() {
+                "present"
+            } else {
+                "missing"
+            }
+            .into(),
+            remedy: "set GMI_MAAS_API_KEY, then run airgap setup --yes",
+        },
+        Check {
+            ok: report.maas_ok,
+            label: "MaaS gateway".into(),
+            detail: if report.maas_ok {
+                "connected; credential accepted"
+            } else {
+                "unreachable, rejected, or invalid response"
+            }
+            .into(),
+            remedy: "check GMI_MAAS_API_KEY and network access to the MaaS gateway",
+        },
+        Check {
+            ok: report.compute_ok,
+            label: "AgentBox compute".into(),
+            detail: if report.compute_ok {
+                "compute eligibility confirmed"
+            } else {
+                "compute access not confirmed"
+            }
+            .into(),
+            remedy: "check GMI_AGENTBOX_API_KEY and that AgentBox is enabled for this account",
+        },
+        Check {
+            ok: report.model_available,
+            label: "Configured model".into(),
+            detail: if report.model_available {
+                format!("{} available", config.model)
+            } else {
+                format!("{} not confirmed in model catalog", config.model)
+            },
+            remedy: "set GMI_MODEL to a model in your catalog, or use airgap_configure",
+        },
+    ];
+    checks.extend(paths.iter().map(|(label, path)| Check {
+        ok: true,
+        label: (*label).into(),
+        detail: path.display().to_string(),
+        remedy: "",
+    }));
     if paths.is_empty() {
-        status(false, "Editor config", "not found; run airgap setup --yes");
+        checks.push(Check {
+            ok: false,
+            label: "Editor config".into(),
+            detail: "no airgap registration found".into(),
+            remedy: "run airgap setup --yes",
+        });
     }
-    let ready = report.maas_ok && report.compute_ok && report.model_available && !paths.is_empty();
-    if ready {
-        println!("\n\x1b[1;32m  ✓ All checks passed. AI code execution safely airgapped.\x1b[0m\n");
+
+    let failed = checks.iter().filter(|check| !check.ok).count();
+    if verbose {
+        for check in &checks {
+            check_line(check);
+        }
+        println!();
+    } else if failed > 0 {
+        for check in checks.iter().filter(|check| !check.ok) {
+            check_line(check);
+        }
+        println!();
+    } else {
+        println!(
+            "  \x1b[32m✓\x1b[0m \x1b[1mGateways:\x1b[0m AgentBox compute & MaaS model access confirmed \x1b[90m({model})\x1b[0m"
+        );
+        println!(
+            "  \x1b[32m✓\x1b[0m \x1b[1mClients:\x1b[0m  {} active configuration{} \x1b[90m({})\x1b[0m · Host protected\n",
+            paths.len(),
+            if paths.len() == 1 { "" } else { "s" },
+            client_names(&paths).join(", ")
+        );
     }
     ensure!(
-        ready,
-        "some checks failed; see the diagnostic statuses above"
+        failed == 0,
+        "{failed} check{} failed{}",
+        if failed == 1 { "" } else { "s" },
+        if verbose {
+            ""
+        } else {
+            "; run airgap doctor --verbose for all checks"
+        }
     );
     Ok(())
 }

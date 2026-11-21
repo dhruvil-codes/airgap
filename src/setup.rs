@@ -508,11 +508,7 @@ pub fn run(args: &[String]) -> Result<()> {
         .into_os_string()
         .into_string()
         .map_err(|_| anyhow::anyhow!("executable path is not UTF-8"))?;
-    println!();
-    println!(
-        "{}",
-        crate::banner(concat!("setup v", env!("CARGO_PKG_VERSION")))
-    );
+    println!("{}", crate::banner("setup"));
     let written = apply(&workspace, home.as_deref(), &options, &config, &command)?;
     for path in &written {
         println!("  \x1b[32m[✓]\x1b[0m Configured {}", path.display());

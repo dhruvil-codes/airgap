@@ -8,9 +8,9 @@ pub mod tools;
 /// Terminal-only header for help, setup and doctor; never sent over MCP.
 pub fn banner(subtitle: &str) -> String {
     format!(
-        "\x1b[1;36m  ▄▀█ █ █▀█ █▀▀ ▄▀█ █▀█\x1b[0m\n\
-         \x1b[1;36m  █▀█ █ █▀▄ █▄█ █▀█ █▀▀\x1b[0m\n\
-         \x1b[90m  🛡️  airgap {subtitle} · GMI AgentBox v2\x1b[0m\n"
+        "\n\x1b[1;36m  🛡️  AIRGAP\x1b[0m \x1b[90mv{} · {}\x1b[0m\n",
+        env!("CARGO_PKG_VERSION"),
+        subtitle
     )
 }
 

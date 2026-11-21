@@ -20,6 +20,8 @@ Changes are recorded here before a release. Version 0.1.0 in Cargo.toml identifi
 - Autonomous agent routing rules and trigger descriptions guide coding agents to sequence tools automatically upon request ("use airgap", "run tests", "fix issue"), with autonomous fallback to `airgap_sandbox_run` when patch verification returns a provider error.
 - `airgap doctor` displays registered editor configurations with explicit client and scope labels (`Claude (user)`, `Cursor (project)`, etc.) and high-contrast terminal indicators.
 - Deduplicated terminal ASCII art banners across `main`, `setup`, and `doctor` into a unified `airgap::banner` helper.
+- The terminal header is a single line (`🛡️  AIRGAP vX · subtitle`) instead of two-row block letters, which showed gaps in some terminal fonts.
+- `airgap doctor` shows a spinner while network checks run, prints a two-line summary when everything passes, and expands only failed checks with a remedy. `airgap doctor --verbose` (`-v`) lists every check and config path.
 - Upgraded `README.md` to tier-1 open source documentation standards with native Mermaid architecture modeling, host-versus-microVM comparison matrix, and production output cards.
 
 ### Fixed

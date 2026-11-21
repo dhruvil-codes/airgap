@@ -11,6 +11,7 @@ airgap setup --claude --yes
 airgap setup --vscode --yes
 airgap setup --rules-only --yes
 airgap doctor
+airgap doctor --verbose
 ```
 
 Without `--yes` or `-y`, setup asks for confirmation in a terminal. Non-interactive runs must pass `--yes`; the installers do this automatically. Editor flags can be combined. Without flags, detection checks workspace/user editor directories and executable names on PATH. If nothing is detected, all three integrations are prepared, including in a clean directory.
@@ -50,6 +51,8 @@ Rules cannot disable other tools, approve a server or guarantee agent behavior. 
 ## Doctor
 
 `airgap doctor` concurrently requests the MaaS model catalog and AgentBox compute eligibility, with a three-second timeout per request. It verifies model availability and looks for editor registrations. Failures return a nonzero exit code without raw provider error bodies or credential values.
+
+When every check passes, doctor prints a two-line summary. Failed checks are always printed with a suggested fix. `--verbose` or `-v` lists every check and registered config path. In a terminal, a spinner runs on stderr while the network checks are in flight.
 
 Sub-second completion is not guaranteed. Doctor is read-only: it does not launch a sandbox, run an inference completion, prove isolation or verify client approvals. The known live patch-verification HTTP 403 can still occur after eligibility checks pass.
 
