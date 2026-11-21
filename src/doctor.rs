@@ -71,11 +71,9 @@ fn status(ok: bool, label: &str, message: &str) {
 
 pub fn run() -> Result<()> {
     println!();
-    println!("\x1b[1;36m  ▄▀█ █ █▀█ █▀▀ ▄▀█ █▀█\x1b[0m");
-    println!("\x1b[1;36m  █▀█ █ █▀▄ █▄█ █▀█ █▀▀\x1b[0m");
     println!(
-        "\x1b[90m  🛡️  airgap doctor v{} · GMI AgentBox v2\x1b[0m\n",
-        env!("CARGO_PKG_VERSION")
+        "{}",
+        crate::banner(concat!("doctor v", env!("CARGO_PKG_VERSION")))
     );
     let config = Config::discover()?;
     status(
@@ -135,17 +133,15 @@ pub fn run() -> Result<()> {
     );
     let workspace = std::env::current_dir()?;
     let paths = setup::configured_paths(&workspace, setup::home_dir().as_deref());
-    for path in &paths {
-        status(true, "Editor config", &path.display().to_string());
+    for (label, path) in &paths {
+        status(true, label, &path.display().to_string());
     }
     if paths.is_empty() {
         status(false, "Editor config", "not found; run airgap setup --yes");
     }
     let ready = report.maas_ok && report.compute_ok && report.model_available && !paths.is_empty();
     if ready {
-        println!(
-            "\n\x1b[32m  ── All checks passed. AI code execution safely airgapped. ──\x1b[0m\n"
-        );
+        println!("\n\x1b[1;32m  ✓ All checks passed. AI code execution safely airgapped.\x1b[0m\n");
     }
     ensure!(
         ready,

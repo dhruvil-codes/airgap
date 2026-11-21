@@ -81,17 +81,23 @@ pub fn config_paths(
     editor: Editor,
 ) -> Vec<(PathBuf, &'static str, bool)> {
     let mut paths = match editor {
-        Editor::Cursor => vec![(workspace.join(".cursor/mcp.json"), "mcpServers", false)],
+        Editor::Cursor => vec![(
+            workspace.join(".cursor").join("mcp.json"),
+            "mcpServers",
+            false,
+        )],
         Editor::Claude => vec![(workspace.join(".mcp.json"), "mcpServers", false)],
         // .mcp.json is also consumed by the current Copilot harness.
         Editor::VsCode => vec![
-            (workspace.join(".vscode/mcp.json"), "servers", false),
+            (workspace.join(".vscode").join("mcp.json"), "servers", false),
             (workspace.join(".mcp.json"), "mcpServers", false),
         ],
     };
     if let Some(home) = home {
         match editor {
-            Editor::Cursor => paths.push((home.join(".cursor/mcp.json"), "mcpServers", true)),
+            Editor::Cursor => {
+                paths.push((home.join(".cursor").join("mcp.json"), "mcpServers", true))
+            }
             Editor::Claude => paths.push((home.join(".claude.json"), "mcpServers", true)),
             Editor::VsCode => {}
         }
@@ -389,7 +395,7 @@ pub fn apply(
         && (options.editors.contains(&Editor::VsCode)
             || (options.editors.is_empty() && detect(workspace, home).contains(&Editor::VsCode)))
     {
-        rules.push(workspace.join(".github/copilot-instructions.md"));
+        rules.push(workspace.join(".github").join("copilot-instructions.md"));
     }
     for path in rules {
         let before = read_existing(&path)?;
@@ -411,28 +417,49 @@ pub fn apply(
     Ok(written)
 }
 
-pub fn configured_paths(workspace: &Path, home: Option<&Path>) -> Vec<PathBuf> {
-    [Editor::Cursor, Editor::Claude, Editor::VsCode]
-        .into_iter()
-        .flat_map(|editor| config_paths(workspace, home, editor))
-        .filter_map(|(path, section, _)| {
-            let metadata = fs::symlink_metadata(&path).ok()?;
-            if !metadata.is_file() || metadata.len() > 4 * 1024 * 1024 {
-                return None;
+/// Registered editor configs as `(label, path)`, user scope first.
+pub fn configured_paths(workspace: &Path, home: Option<&Path>) -> Vec<(&'static str, PathBuf)> {
+    let mut found: Vec<(bool, &'static str, PathBuf)> = Vec::new();
+    for editor in [Editor::Claude, Editor::Cursor, Editor::VsCode] {
+        for (path, section, is_user) in config_paths(workspace, home, editor) {
+            // The workspace .mcp.json is shared by Claude Code and VS Code; report it once.
+            if found.iter().any(|(_, _, seen)| *seen == path) || !registers_airgap(&path, section) {
+                continue;
             }
-            let data = fs::read(&path).ok()?;
-            let value: Value = serde_json::from_str(text(&data).ok()?).ok()?;
-            value
-                .get(section)?
-                .get("airgap")?
-                .get("command")?
-                .as_str()
-                .filter(|s| !s.is_empty())?;
-            Some(path)
-        })
-        .collect::<BTreeSet<_>>()
+            let label = match (editor, section, is_user) {
+                (Editor::Claude, _, true) => "Claude (user)",
+                (Editor::Cursor, _, true) => "Cursor (user)",
+                (Editor::Cursor, _, false) => "Cursor (project)",
+                (Editor::VsCode, "servers", _) => "VS Code (project)",
+                _ => "Claude (project)",
+            };
+            found.push((is_user, label, path));
+        }
+    }
+    found.sort_by_key(|(is_user, label, _)| (!*is_user, *label));
+    found
         .into_iter()
+        .map(|(_, label, path)| (label, path))
         .collect()
+}
+
+fn registers_airgap(path: &Path, section: &str) -> bool {
+    (|| {
+        let metadata = fs::symlink_metadata(path).ok()?;
+        if !metadata.is_file() || metadata.len() > 4 * 1024 * 1024 {
+            return None;
+        }
+        let data = fs::read(path).ok()?;
+        let value: Value = serde_json::from_str(text(&data).ok()?).ok()?;
+        value
+            .get(section)?
+            .get("airgap")?
+            .get("command")?
+            .as_str()
+            .filter(|s| !s.is_empty())?;
+        Some(())
+    })()
+    .is_some()
 }
 
 pub fn run(args: &[String]) -> Result<()> {
@@ -482,11 +509,9 @@ pub fn run(args: &[String]) -> Result<()> {
         .into_string()
         .map_err(|_| anyhow::anyhow!("executable path is not UTF-8"))?;
     println!();
-    println!("\x1b[1;36m  ▄▀█ █ █▀█ █▀▀ ▄▀█ █▀█\x1b[0m");
-    println!("\x1b[1;36m  █▀█ █ █▀▄ █▄█ █▀█ █▀▀\x1b[0m");
     println!(
-        "\x1b[90m  🛡️  airgap setup v{} · GMI AgentBox v2\x1b[0m\n",
-        env!("CARGO_PKG_VERSION")
+        "{}",
+        crate::banner(concat!("setup v", env!("CARGO_PKG_VERSION")))
     );
     let written = apply(&workspace, home.as_deref(), &options, &config, &command)?;
     for path in &written {

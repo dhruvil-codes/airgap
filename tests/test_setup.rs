@@ -93,6 +93,43 @@ fn test_setup_claude_merge() {
 }
 
 #[test]
+fn configured_paths_name_each_client_and_scope_with_native_separators() {
+    let temp = tempfile::tempdir().unwrap();
+    let home = tempfile::tempdir().unwrap();
+    setup::apply(
+        temp.path(),
+        Some(home.path()),
+        &options(&[Editor::Cursor, Editor::Claude, Editor::VsCode]),
+        &config(),
+        "airgap",
+    )
+    .unwrap();
+    let found = setup::configured_paths(temp.path(), Some(home.path()));
+    let expected = [
+        ("Claude (user)", home.path().join(".claude.json")),
+        (
+            "Cursor (user)",
+            home.path().join(".cursor").join("mcp.json"),
+        ),
+        ("Claude (project)", temp.path().join(".mcp.json")),
+        (
+            "Cursor (project)",
+            temp.path().join(".cursor").join("mcp.json"),
+        ),
+        (
+            "VS Code (project)",
+            temp.path().join(".vscode").join("mcp.json"),
+        ),
+    ];
+    assert_eq!(found, expected);
+    if cfg!(windows) {
+        for (_, path) in &found {
+            assert!(!path.to_string_lossy().contains('/'), "{}", path.display());
+        }
+    }
+}
+
+#[test]
 fn test_setup_idempotency() {
     let temp = tempfile::tempdir().unwrap();
     let home = tempfile::tempdir().unwrap();

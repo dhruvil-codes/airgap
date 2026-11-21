@@ -18,9 +18,13 @@ Changes are recorded here before a release. Version 0.1.0 in Cargo.toml identifi
 
 - MCP tool text output for sandbox runs, patch verification, supply-chain audit, secret redaction and injection scans is compact Markdown (verdict, duration, environment and host-protection note) instead of ASCII banners and box frames. `structuredContent` is unchanged; ASCII art remains only in terminal commands.
 - Autonomous agent routing rules and trigger descriptions guide coding agents to sequence tools automatically upon request ("use airgap", "run tests", "fix issue"), with autonomous fallback to `airgap_sandbox_run` when patch verification returns a provider error.
+- `airgap doctor` displays registered editor configurations with explicit client and scope labels (`Claude (user)`, `Cursor (project)`, etc.) and high-contrast terminal indicators.
+- Deduplicated terminal ASCII art banners across `main`, `setup`, and `doctor` into a unified `airgap::banner` helper.
+- Upgraded `README.md` to tier-1 open source documentation standards with native Mermaid architecture modeling, host-versus-microVM comparison matrix, and production output cards.
 
 ### Fixed
 
+- Normalized Windows path separators in `setup` and `doctor` output to eliminate mixed forward/backward slashes.
 - Base URLs (`GMI_AGENTBOX_BASE_URL`, `GMI_MAAS_BASE_URL`) are read exclusively from process environment variables; repository `.env` values are ignored to prevent malicious repos from exfiltrating credentials.
 - Workspace configuration files (`.mcp.json`, `.cursor/mcp.json`, `.vscode/mcp.json`) no longer receive API keys during setup; keys are restricted to user-level configs (`~/.claude.json`, `~/.cursor/mcp.json`).
 - Untrusted text in `airgap_scan_injection` is scrubbed with the local secret redactor before uploading to GMI MaaS.

@@ -7,7 +7,8 @@ fn main() -> anyhow::Result<()> {
         Some("init" | "setup") => return setup::run(&args[1..]),
         Some("doctor") if args.len() == 1 => return doctor::run(),
         Some("--help" | "-h" | "help") if args.len() == 1 => {
-            println!("\x1b[1;36m  ▄▀█ █ █▀█ █▀▀ ▄▀█ █▀█\x1b[0m\n\x1b[1;36m  █▀█ █ █▀▄ █▄█ █▀█ █▀▀\x1b[0m\n\x1b[90m  🛡️  airgap v{} · GMI AgentBox v2\x1b[0m\n\nUsage: airgap [--mcp]\n       airgap init|setup [options]\n       airgap doctor\n       airgap --version\n\nNo arguments or --mcp: serve MCP JSON-RPC over stdio.\ninit/setup: configure editors and agent routing rules.\ndoctor: check credentials, gateways, model access and editor registration.\n\nRun airgap setup --help for setup options.", env!("CARGO_PKG_VERSION"));
+            let banner = airgap::banner(concat!("v", env!("CARGO_PKG_VERSION")));
+            println!("{banner}\nUsage: airgap [--mcp]\n       airgap init|setup [options]\n       airgap doctor\n       airgap --version\n\nNo arguments or --mcp: serve MCP JSON-RPC over stdio.\ninit/setup: configure editors and agent routing rules.\ndoctor: check credentials, gateways, model access and editor registration.\n\nRun airgap setup --help for setup options.");
             return Ok(());
         }
         Some("--version" | "-v" | "-V") if args.len() == 1 => {
