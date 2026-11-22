@@ -148,8 +148,23 @@ async fn sandbox_lifecycle_upload_poll_redact_and_delete_in_order() {
     let requests = server.received_requests().await.unwrap();
     let creation: Value = requests[0].body_json().unwrap();
     assert_eq!(creation["image_url"], "docker.io/library/rust:1-bookworm");
+    assert_eq!(creation["instance_type"], "gmi.sandbox.medium");
     let launch: Value = requests[1].body_json().unwrap();
     assert_eq!(launch["timeout_seconds"], 190);
+    assert_eq!(launch["instance_type"], "gmi.sandbox.medium");
+    let commands: Vec<String> = requests
+        .iter()
+        .filter(|r| r.url.path() == "/tasks/test-box/executions" && r.method.as_str() == "POST")
+        .map(|r| {
+            r.body_json::<Value>().unwrap()["command"]
+                .as_str()
+                .unwrap()
+                .to_owned()
+        })
+        .collect();
+    assert!(commands[0].contains("mkdir -p /workspace /root/tmp"));
+    assert!(commands[0].contains("corepack enable 2>/dev/null || true"));
+    assert!(commands[1].starts_with("cd /workspace && export TMPDIR=/root/tmp && export PNPM_HOME=/root/.local/share/pnpm && export PATH=\"$PNPM_HOME:$PATH\" && exec sh -c 'cargo test'"));
     let deletions: Vec<_> = requests
         .iter()
         .filter(|r| r.method.as_str() == "DELETE")
@@ -172,6 +187,59 @@ async fn unsuccessful_commands_are_not_passed_and_still_cleaned_up() {
     assert!(!output.passed);
     assert_eq!(output.exit_code, 2);
     agent.shutdown().await;
+}
+
+#[tokio::test]
+async fn exit_zero_with_kill_or_failed_tests_is_not_passed() {
+    for stdout in [
+        "sh: line 1:    42 Killed    node vitest",
+        "test result: FAILED. 2 passed; 1 failed;",
+    ] {
+        let server = MockServer::start().await;
+        lifecycle(&server).await;
+        executions(&server, 0, stdout, false).await;
+        let agent = AgentBox::new(http_client().unwrap(), config(&server));
+        let output = agent
+            .run("true".into(), Files::new(), None, 10)
+            .await
+            .unwrap();
+        assert!(!output.passed, "{stdout}");
+        assert_eq!(output.exit_code, 0);
+        agent.shutdown().await;
+    }
+}
+
+#[tokio::test]
+async fn instance_type_comes_from_configuration() {
+    let server = MockServer::start().await;
+    lifecycle(&server).await;
+    executions(&server, 0, "ok", false).await;
+    let mut config = (*config(&server)).clone();
+    config.instance_type = "gmi.sandbox.large".into();
+    let agent = AgentBox::new(http_client().unwrap(), Arc::new(config));
+    agent
+        .run("true".into(), Files::new(), None, 10)
+        .await
+        .unwrap();
+    let requests = server.received_requests().await.unwrap();
+    for request in &requests[..2] {
+        assert_eq!(
+            request.body_json::<Value>().unwrap()["instance_type"],
+            "gmi.sandbox.large"
+        );
+    }
+    agent.shutdown().await;
+    let from_env = Config::from_values(BTreeMap::from([(
+        "GMI_AGENTBOX_INSTANCE_TYPE".into(),
+        "gmi.sandbox.small".into(),
+    )]))
+    .unwrap();
+    assert_eq!(from_env.instance_type, "gmi.sandbox.small");
+    assert!(Config::from_values(BTreeMap::from([(
+        "GMI_AGENTBOX_INSTANCE_TYPE".into(),
+        "bad type; rm".into(),
+    )]))
+    .is_err());
 }
 
 #[tokio::test]

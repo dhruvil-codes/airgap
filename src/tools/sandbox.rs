@@ -94,6 +94,24 @@ pub async fn verify(
     })
 }
 
+/// Exit 0 alone is not a pass: OOM kills and failed test summaries can still exit 0.
+pub fn output_passed(exit_code: i64, stdout: &str, stderr: &str) -> bool {
+    exit_code == 0
+        && !killed(stdout)
+        && !killed(stderr)
+        && !reports_failed_tests(&format!("{stdout}\n{stderr}"))
+}
+
+pub fn killed(output: &str) -> bool {
+    static KILLED: LazyLock<Regex> =
+        LazyLock::new(|| Regex::new(r"\b(?:Killed|SIGKILL)\b").expect("static regex"));
+    KILLED.is_match(output)
+}
+
+pub fn reports_failed_tests(output: &str) -> bool {
+    test_counts(output).1.is_some_and(|failed| failed > 0)
+}
+
 pub fn test_counts(output: &str) -> (Option<u64>, Option<u64>) {
     static SUMMARY: LazyLock<Regex> = LazyLock::new(|| {
         Regex::new(r"(?m)(?:test result: (?:ok|FAILED)\. )?(\d+) passed[;,] (\d+) failed")

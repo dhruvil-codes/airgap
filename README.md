@@ -79,7 +79,7 @@ airgap setup --cursor   # one editor only
 airgap setup --rules-only --yes   # agent routing rules only
 ```
 
-Setup registers the server and adds a managed routing-rule block to `.cursorrules` and `CLAUDE.md`. GMI keys are written only to user-level configs (`~/.claude.json`, `~/.cursor/mcp.json`). Workspace files such as `.mcp.json`, `.cursor/mcp.json` and `.vscode/mcp.json` never store credentials, and setup removes keys it finds there. Set `GMI_AGENTBOX_API_KEY` and `GMI_MAAS_API_KEY` first (see [.env.example](.env.example)); local scanners work without them.
+Setup registers the server for Claude Code, Cursor, VS Code and Factory Droid, and adds a managed routing-rule block to `.cursorrules`, `CLAUDE.md` and `AGENTS.md`. For Claude Code it also adds `mcp__airgap__*` to `permissions.allow`, so airgap tools run without a prompt on every call. GMI keys are written only to user-level configs (`~/.claude.json`, `~/.cursor/mcp.json`, `~/.factory/mcp.json`). Workspace files such as `.mcp.json`, `.cursor/mcp.json`, `.vscode/mcp.json` and `.factory/mcp.json` never store credentials, and setup removes keys it finds there. Set `GMI_AGENTBOX_API_KEY` and `GMI_MAAS_API_KEY` first (see [.env.example](.env.example)); local scanners work without them.
 
 **3. Check health.**
 

@@ -83,7 +83,9 @@ Example `airgap_sandbox_run` arguments:
 }
 ```
 
-The default image is `docker.io/library/rust:1-bookworm` for a root Cargo.toml, `docker.io/library/node:20-bookworm` for a root package.json, or `docker.io/library/python:3.12-bookworm` otherwise. Override it for other stacks. Images must provide `sh`, `tar`, `mkdir` and `sleep`; verification also needs `git`. Pin an image digest for repeatable runs. Files are UTF-8 regular files with mode 0644, without executable bits or symlinks. The remote working directory is `/workspace`.
+The default image is `docker.io/library/rust:1-bookworm` for a root Cargo.toml, `docker.io/library/node:20-bookworm` for a root package.json, or `docker.io/library/python:3.12-bookworm` otherwise. Override it for other stacks. Images must provide `sh`, `tar`, `mkdir` and `sleep`; verification also needs `git`. Pin an image digest for repeatable runs. Files are UTF-8 regular files with mode 0644, without executable bits or symlinks. The remote working directory is `/workspace`. `/tmp` is a 1 GiB tmpfs, so commands run with `TMPDIR=/root/tmp` on the root disk. Setup runs `corepack enable` when the image has Corepack, so `pnpm` and `yarn` work without a global npm install, and `PNPM_HOME=/root/.local/share/pnpm` is on `PATH`.
+
+A sandbox run is `passed` only when the exit code is 0, the output contains no `Killed` or `SIGKILL` marker, and any recognized Rust or pytest summary reports zero failures. Exit code 137 is reported as an out-of-memory kill with a suggestion to use a larger instance type.
 
 Patch verification requires a clean base snapshot because a diff alone cannot reconstruct a repository. It never reads the host working tree. `verified` requires command exit 0, untruncated logs, a recognized Rust or pytest summary, at least one passing test, and zero reported failures. Unknown summaries return null counts and `verified: false`, even if `command_passed` is true. Test summaries and exit codes are evidence supplied by the remote process; hostile tests can forge them. Exit zero cannot prove all intended tests ran. Zero-test runs are never verified.
 
@@ -99,6 +101,7 @@ The loader searches the current directory and four parents. In each directory it
 | `GMI_AGENTBOX_API_KEY` | Compute-scoped AgentBox key |
 | `GMI_MAAS_API_KEY` | Inference key |
 | `GMI_DEFAULT_IDC` | `us-central-iowa16` |
+| `GMI_AGENTBOX_INSTANCE_TYPE` | `gmi.sandbox.medium` (2 vCPU, 4 GiB). `gmi.sandbox.small` is 1 vCPU, 2 GiB at about half the price; `gmi.sandbox.large` is 4 vCPU, 8 GiB |
 | `GMI_MODEL` | `deepseek-ai/DeepSeek-V4.1-Flash` |
 | `GMI_AGENTBOX_BASE_URL` | `https://api.gmi-serving.com/v1/agents` |
 | `GMI_MAAS_BASE_URL` | `https://api.gmi-serving.com/v1` |

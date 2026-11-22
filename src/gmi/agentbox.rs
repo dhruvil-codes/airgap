@@ -152,7 +152,7 @@ impl AgentBox {
         let job = async {
             let agent = self.request(Method::POST, "/deployments", Some(json!({
                 "title": format!("airgap-{}", uuid::Uuid::new_v4().simple()),
-                "image_url": image, "idc": self.config.idc, "instance_type": "gmi.sandbox.small",
+                "image_url": image, "idc": self.config.idc, "instance_type": self.config.instance_type,
                 "runtime": "sandbox", "deployment_type": "gmi-ce", "start_cmd": "sleep infinity",
                 "env": [], "ports": []
             }))).await?;
@@ -177,7 +177,7 @@ impl AgentBox {
                     Method::POST,
                     &format!("/deployments/{agent_slug}/tasks"),
                     Some(json!({
-                        "idc_name": self.config.idc, "instance_type": "gmi.sandbox.small",
+                        "idc_name": self.config.idc, "instance_type": self.config.instance_type,
                         "timeout_seconds": seconds + 180, "env": [], "ports": [],
                         "metadata": {"application": "airgap"}
                     })),
@@ -205,14 +205,18 @@ impl AgentBox {
             let setup = self
                 .execute(
                     &id,
-                    "mkdir -p /workspace && tar -xzf /tmp/airgap-input.tar.gz -C /workspace".into(),
+                    // /tmp is a 1 GiB tmpfs; package managers need the 20 GiB root disk.
+                    "mkdir -p /workspace /root/tmp && export TMPDIR=/root/tmp && tar -xzf /tmp/airgap-input.tar.gz -C /workspace && (corepack enable 2>/dev/null || true)".into(),
                     30,
                 )
                 .await?;
             ensure!(setup.exit_code == 0, "remote workspace extraction failed");
             self.execute(
                 &id,
-                format!("cd /workspace && exec sh -c {}", shell_quote(&command)),
+                format!(
+                    "cd /workspace && export TMPDIR=/root/tmp && export PNPM_HOME=/root/.local/share/pnpm && export PATH=\"$PNPM_HOME:$PATH\" && exec sh -c {}",
+                    shell_quote(&command)
+                ),
                 seconds,
             )
             .await
@@ -318,16 +322,20 @@ impl AgentBox {
                             .and_then(Value::as_str)
                             .unwrap_or(""),
                     );
+                    let passed = !matches!(
+                        status,
+                        "failed" | "error" | "cancelled" | "canceled" | "timed_out"
+                    ) && crate::tools::sandbox::output_passed(
+                        exit_code.into(),
+                        &stdout,
+                        &stderr,
+                    );
                     return Ok(ExecutionResult {
                         exit_code,
                         stdout,
                         stderr,
                         duration_ms: start.elapsed().as_millis() as u64,
-                        passed: exit_code == 0
-                            && !matches!(
-                                status,
-                                "failed" | "error" | "cancelled" | "canceled" | "timed_out"
-                            ),
+                        passed,
                         stdout_truncated: execution
                             .get("stdout_truncated")
                             .and_then(Value::as_bool)

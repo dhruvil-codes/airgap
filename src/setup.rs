@@ -29,13 +29,17 @@ Trigger: when the user says 'use airgap', mentions airgap or a sandbox, or asks 
 These instructions guide tool selection; client tool permissions remain authoritative.\n\
 <!-- airgap:end -->";
 
-pub const HELP: &str = "Usage: airgap init|setup [--yes|-y] [--cursor] [--claude] [--vscode] [--rules-only]\n\nWithout editor flags, detect editors; prepare all three if none are detected.\nSelected editors receive workspace configuration and Cursor/Claude user configuration.\n--rules-only updates only workspace .cursorrules and CLAUDE.md.\nDiscovered keys are stored in editor configuration files. Never commit those files.\n";
+/// Claude Code permission rule that approves every airgap tool without a prompt.
+pub const CLAUDE_ALLOW_RULE: &str = "mcp__airgap__*";
+
+pub const HELP: &str = "Usage: airgap init|setup [--yes|-y] [--cursor] [--claude] [--vscode] [--factory|--droid] [--rules-only]\n\nWithout editor flags, detect editors; prepare all four if none are detected.\nSelected editors receive workspace configuration and Cursor/Claude/Factory Droid user configuration.\nClaude Code also gets a permissions.allow rule for airgap tools in ~/.claude/settings.json\n(and .claude/settings.json when the workspace has a .claude directory).\n--rules-only updates only workspace .cursorrules, CLAUDE.md and AGENTS.md.\nDiscovered keys are stored in user-level editor configuration files. Never commit those files.\n";
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
 pub enum Editor {
     Cursor,
     Claude,
     VsCode,
+    Factory,
 }
 
 #[derive(Default, Debug)]
@@ -60,6 +64,9 @@ impl Options {
                 }
                 "--vscode" => {
                     options.editors.insert(Editor::VsCode);
+                }
+                "--factory" | "--droid" => {
+                    options.editors.insert(Editor::Factory);
                 }
                 _ => bail!("unknown setup option; run airgap setup --help"),
             }
@@ -92,6 +99,11 @@ pub fn config_paths(
             (workspace.join(".vscode").join("mcp.json"), "servers", false),
             (workspace.join(".mcp.json"), "mcpServers", false),
         ],
+        Editor::Factory => vec![(
+            workspace.join(".factory").join("mcp.json"),
+            "mcpServers",
+            false,
+        )],
     };
     if let Some(home) = home {
         match editor {
@@ -99,6 +111,9 @@ pub fn config_paths(
                 paths.push((home.join(".cursor").join("mcp.json"), "mcpServers", true))
             }
             Editor::Claude => paths.push((home.join(".claude.json"), "mcpServers", true)),
+            Editor::Factory => {
+                paths.push((home.join(".factory").join("mcp.json"), "mcpServers", true))
+            }
             Editor::VsCode => {}
         }
     }
@@ -111,6 +126,7 @@ pub fn detect(workspace: &Path, home: Option<&Path>) -> BTreeSet<Editor> {
         (Editor::Cursor, ".cursor", "cursor"),
         (Editor::Claude, ".claude", "claude"),
         (Editor::VsCode, ".vscode", "code"),
+        (Editor::Factory, ".factory", "droid"),
     ] {
         let workspace_marker = workspace.join(marker).exists();
         let home_marker = home.is_some_and(|home| {
@@ -129,7 +145,12 @@ pub fn detect(workspace: &Path, home: Option<&Path>) -> BTreeSet<Editor> {
         }
     }
     if editors.is_empty() {
-        editors.extend([Editor::Cursor, Editor::Claude, Editor::VsCode]);
+        editors.extend([
+            Editor::Cursor,
+            Editor::Claude,
+            Editor::VsCode,
+            Editor::Factory,
+        ]);
     }
     editors
 }
@@ -179,6 +200,12 @@ pub fn merge_config(
     if config.idc != crate::config::DEFAULT_IDC {
         discovered.insert("GMI_DEFAULT_IDC".into(), config.idc.clone().into());
     }
+    if config.instance_type != crate::config::DEFAULT_INSTANCE_TYPE {
+        discovered.insert(
+            "GMI_AGENTBOX_INSTANCE_TYPE".into(),
+            config.instance_type.clone().into(),
+        );
+    }
     for (name, value, default) in [
         (
             "GMI_AGENTBOX_BASE_URL",
@@ -219,6 +246,25 @@ pub fn merge_config(
         } else if !discovered.is_empty() {
             entry.insert("env".into(), Value::Object(discovered));
         }
+    }
+    Ok(document)
+}
+
+/// Add the airgap allow rule to Claude Code settings, retaining every other setting and rule.
+pub fn merge_claude_permissions(mut document: Value) -> Result<Value> {
+    let allow = document
+        .as_object_mut()
+        .context("Claude settings must be a JSON object")?
+        .entry("permissions")
+        .or_insert_with(|| json!({}))
+        .as_object_mut()
+        .context("Claude permissions must be a JSON object")?
+        .entry("allow")
+        .or_insert_with(|| json!([]))
+        .as_array_mut()
+        .context("Claude permissions.allow must be an array")?;
+    if !allow.iter().any(|rule| rule == CLAUDE_ALLOW_RULE) {
+        allow.push(CLAUDE_ALLOW_RULE.into());
     }
     Ok(document)
 }
@@ -346,6 +392,35 @@ fn write_change(change: &Change) -> Result<bool> {
     Ok(true)
 }
 
+fn json_change(
+    path: PathBuf,
+    private: bool,
+    merge: impl FnOnce(Value) -> Result<Value>,
+) -> Result<Change> {
+    let before = read_existing(&path)?;
+    let old: Value = match &before {
+        Some(bytes) => serde_json::from_str(text(bytes)?).map_err(|_| {
+            anyhow::anyhow!("invalid JSON in {}; file was not changed", path.display())
+        })?,
+        None => json!({}),
+    };
+    let merged = merge(old.clone()).with_context(|| format!("cannot merge {}", path.display()))?;
+    let after = match &before {
+        Some(bytes) if old == merged => bytes.clone(),
+        _ => {
+            let mut bytes = serde_json::to_vec_pretty(&merged)?;
+            bytes.push(b'\n');
+            bytes
+        }
+    };
+    Ok(Change {
+        path,
+        before,
+        after,
+        private,
+    })
+}
+
 /// Preflight every file before writing any; each changed file is replaced atomically.
 pub fn apply(
     workspace: &Path,
@@ -355,46 +430,40 @@ pub fn apply(
     command: &str,
 ) -> Result<Vec<PathBuf>> {
     let mut changes = Vec::new();
-    if !options.rules_only {
-        let editors = if options.editors.is_empty() {
-            detect(workspace, home)
-        } else {
-            options.editors.clone()
-        };
-        let paths: BTreeSet<_> = editors
-            .iter()
-            .flat_map(|editor| config_paths(workspace, home, *editor))
+    let editors = if options.rules_only {
+        BTreeSet::new()
+    } else if options.editors.is_empty() {
+        detect(workspace, home)
+    } else {
+        options.editors.clone()
+    };
+    let paths: BTreeSet<_> = editors
+        .iter()
+        .flat_map(|editor| config_paths(workspace, home, *editor))
+        .collect();
+    for (path, section, is_user) in paths {
+        changes.push(json_change(path, true, |old| {
+            merge_config(old, section, config, command, is_user)
+        })?);
+    }
+    if editors.contains(&Editor::Claude) {
+        let mut settings: Vec<PathBuf> = home
+            .map(|home| home.join(".claude").join("settings.json"))
+            .into_iter()
             .collect();
-        for (path, section, is_user) in paths {
-            let before = read_existing(&path)?;
-            let old: Value = match &before {
-                Some(bytes) => serde_json::from_str(text(bytes)?).map_err(|_| {
-                    anyhow::anyhow!("invalid JSON in {}; file was not changed", path.display())
-                })?,
-                None => json!({}),
-            };
-            let merged = merge_config(old.clone(), section, config, command, is_user)
-                .with_context(|| format!("cannot merge {}", path.display()))?;
-            let after = if old == merged && before.is_some() {
-                before.clone().unwrap_or_default()
-            } else {
-                let mut bytes = serde_json::to_vec_pretty(&merged)?;
-                bytes.push(b'\n');
-                bytes
-            };
-            changes.push(Change {
-                path,
-                before,
-                after,
-                private: true,
-            });
+        if workspace.join(".claude").is_dir() {
+            settings.push(workspace.join(".claude").join("settings.json"));
+        }
+        for path in settings {
+            changes.push(json_change(path, false, merge_claude_permissions)?);
         }
     }
-    let mut rules = vec![workspace.join(".cursorrules"), workspace.join("CLAUDE.md")];
-    if !options.rules_only
-        && (options.editors.contains(&Editor::VsCode)
-            || (options.editors.is_empty() && detect(workspace, home).contains(&Editor::VsCode)))
-    {
+    let mut rules = vec![
+        workspace.join(".cursorrules"),
+        workspace.join("CLAUDE.md"),
+        workspace.join("AGENTS.md"),
+    ];
+    if editors.contains(&Editor::VsCode) {
         rules.push(workspace.join(".github").join("copilot-instructions.md"));
     }
     for path in rules {
@@ -420,7 +489,12 @@ pub fn apply(
 /// Registered editor configs as `(label, path)`, user scope first.
 pub fn configured_paths(workspace: &Path, home: Option<&Path>) -> Vec<(&'static str, PathBuf)> {
     let mut found: Vec<(bool, &'static str, PathBuf)> = Vec::new();
-    for editor in [Editor::Claude, Editor::Cursor, Editor::VsCode] {
+    for editor in [
+        Editor::Claude,
+        Editor::Cursor,
+        Editor::VsCode,
+        Editor::Factory,
+    ] {
         for (path, section, is_user) in config_paths(workspace, home, editor) {
             // The workspace .mcp.json is shared by Claude Code and VS Code; report it once.
             if found.iter().any(|(_, _, seen)| *seen == path) || !registers_airgap(&path, section) {
@@ -431,6 +505,8 @@ pub fn configured_paths(workspace: &Path, home: Option<&Path>) -> Vec<(&'static 
                 (Editor::Cursor, _, true) => "Cursor (user)",
                 (Editor::Cursor, _, false) => "Cursor (project)",
                 (Editor::VsCode, "servers", _) => "VS Code (project)",
+                (Editor::Factory, _, true) => "Factory Droid (user)",
+                (Editor::Factory, _, false) => "Factory Droid (project)",
                 _ => "Claude (project)",
             };
             found.push((is_user, label, path));

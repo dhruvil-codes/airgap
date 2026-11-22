@@ -269,7 +269,8 @@ fn sandbox_summary(environment: &str, value: &serde_json::Value, elapsed_ms: u64
     let stdout = text_field(value, "stdout");
     let stderr = text_field(value, "stderr");
     // The provider can report a timed-out or cancelled run with exit code 0.
-    let passed = value["passed"].as_bool().unwrap_or(false) && exit_code == 0;
+    let passed = value["passed"].as_bool().unwrap_or(false)
+        && sandbox::output_passed(exit_code, stdout, stderr);
     let (icon, status) = if passed {
         ("✅", "PASSED")
     } else {
@@ -292,7 +293,7 @@ fn sandbox_summary(environment: &str, value: &serde_json::Value, elapsed_ms: u64
         out.push_str(&output_block(output, truncated));
         out.push_str(&format!(
             "\n\n💡 **Remedy:** {}",
-            sandbox_remedy(exit_code, output)
+            sandbox_remedy(exit_code, output, &format!("{stdout}\n{stderr}"))
         ));
     }
     push_cleanup_warning(&mut out, value);
@@ -302,18 +303,30 @@ fn sandbox_summary(environment: &str, value: &serde_json::Value, elapsed_ms: u64
     out
 }
 
-fn sandbox_remedy(exit_code: i64, output: &str) -> String {
+const OOM_REMEDY: &str = "Process was terminated by SIGKILL (Out of Memory). Try allocating more memory with GMI_AGENTBOX_INSTANCE_TYPE=gmi.sandbox.large or running fewer parallel workers.";
+
+/// `output` is the stream shown to the agent; `all_output` is stdout and stderr combined.
+fn sandbox_remedy(exit_code: i64, output: &str, all_output: &str) -> String {
     let lower = output.to_ascii_lowercase();
+    let failed_tests = sandbox::test_counts(all_output)
+        .1
+        .filter(|failed| *failed > 0);
     match exit_code {
         127 => "Executable not found in container image. Install it in the command or pass an `image` that provides it.".into(),
         126 => "Command found but not executable. Check file permissions or invoke it through its interpreter.".into(),
-        124 | 137 => "Process was killed, usually by the timeout or memory limit. Raise `timeout_secs` or reduce the workload.".into(),
+        137 => OOM_REMEDY.into(),
+        _ if sandbox::killed(all_output) => OOM_REMEDY.into(),
+        124 => "Process exceeded its time limit. Raise `timeout_secs` or reduce the workload.".into(),
         _ if lower.contains("cannot find module")
             || lower.contains("no module named")
             || lower.contains("unresolved import") =>
         {
             "A dependency is missing from the sandbox. Install it in the command or upload the manifest and sources it needs.".into()
         }
+        _ if failed_tests.is_some() => format!(
+            "{} test(s) failed. Fix the failing tests and re-run.",
+            failed_tests.unwrap_or_default()
+        ),
         _ => match last_line(output) {
             Some(line) => format!("Fix the reported error and re-run: {}", inline_code(line)),
             None => "The command failed without output. Re-run with verbose flags to see the cause.".into(),
@@ -601,6 +614,44 @@ mod tests {
             out.contains("⚠️ **Cleanup:** remote cleanup failed"),
             "{out}"
         );
+    }
+
+    #[test]
+    fn sandbox_oom_kill_is_failed_with_memory_remedy() {
+        for value in [
+            json!({"exit_code":137,"stdout":"","stderr":"","duration_ms":7,"passed":false}),
+            json!({"exit_code":0,"stdout":"","stderr":"sh: line 1:    42 Killed    node vitest\n","duration_ms":7,"passed":true}),
+        ] {
+            let out = format_summary(
+                &Summary::Sandbox {
+                    environment: "img".into(),
+                },
+                &value,
+                1,
+            );
+            assert!(out.contains("❌ **Status: FAILED**"), "{out}");
+            assert!(
+                out.contains("terminated by SIGKILL (Out of Memory)"),
+                "{out}"
+            );
+        }
+    }
+
+    #[test]
+    fn sandbox_exit_zero_with_failed_tests_is_failed() {
+        let value = json!({"exit_code":0,"stdout":"test result: FAILED. 2 passed; 1 failed;\n","stderr":"","duration_ms":7,"passed":true});
+        let out = format_summary(
+            &Summary::Sandbox {
+                environment: "img".into(),
+            },
+            &value,
+            1,
+        );
+        assert!(
+            out.contains("❌ **Status: FAILED** (Exit Code: 0)"),
+            "{out}"
+        );
+        assert!(out.contains("1 test(s) failed."), "{out}");
     }
 
     #[test]

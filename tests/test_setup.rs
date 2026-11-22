@@ -93,6 +93,88 @@ fn test_setup_claude_merge() {
 }
 
 #[test]
+fn factory_droid_gets_user_and_project_configs_and_agents_md() {
+    let temp = tempfile::tempdir().unwrap();
+    let home = tempfile::tempdir().unwrap();
+    setup::apply(
+        temp.path(),
+        Some(home.path()),
+        &options(&[Editor::Factory]),
+        &config(),
+        "airgap",
+    )
+    .unwrap();
+    let project = read(temp.path().join(".factory").join("mcp.json"));
+    assert_eq!(project["mcpServers"]["airgap"]["command"], "airgap");
+    assert_eq!(project["mcpServers"]["airgap"]["args"], json!(["--mcp"]));
+    assert!(project["mcpServers"]["airgap"].get("env").is_none());
+    let user = read(home.path().join(".factory").join("mcp.json"));
+    assert_eq!(
+        user["mcpServers"]["airgap"]["env"]["GMI_AGENTBOX_API_KEY"],
+        "synthetic-compute"
+    );
+    let agents = fs::read_to_string(temp.path().join("AGENTS.md")).unwrap();
+    assert!(agents.contains("<!-- airgap:begin -->") && agents.contains("airgap_sandbox_run"));
+    assert!(!home.path().join(".claude").exists());
+    let found = setup::configured_paths(temp.path(), Some(home.path()));
+    let labels: Vec<_> = found.iter().map(|(label, _)| *label).collect();
+    assert_eq!(labels, ["Factory Droid (user)", "Factory Droid (project)"]);
+}
+
+#[test]
+fn claude_settings_allow_airgap_tools_and_keep_existing_rules() {
+    let temp = tempfile::tempdir().unwrap();
+    let home = tempfile::tempdir().unwrap();
+    fs::create_dir(home.path().join(".claude")).unwrap();
+    fs::write(
+        home.path().join(".claude").join("settings.json"),
+        r#"{"model":"keep","permissions":{"allow":["Bash(ls:*)"],"deny":["Read(.env)"]}}"#,
+    )
+    .unwrap();
+    let options = options(&[Editor::Claude]);
+    setup::apply(
+        temp.path(),
+        Some(home.path()),
+        &options,
+        &config(),
+        "airgap",
+    )
+    .unwrap();
+    let user = read(home.path().join(".claude").join("settings.json"));
+    assert_eq!(user["model"], "keep");
+    assert_eq!(user["permissions"]["deny"], json!(["Read(.env)"]));
+    assert_eq!(
+        user["permissions"]["allow"],
+        json!(["Bash(ls:*)", "mcp__airgap__*"])
+    );
+    // No workspace .claude directory, so no project settings are created.
+    assert!(!temp.path().join(".claude").exists());
+
+    fs::create_dir(temp.path().join(".claude")).unwrap();
+    setup::apply(
+        temp.path(),
+        Some(home.path()),
+        &options,
+        &config(),
+        "airgap",
+    )
+    .unwrap();
+    let project = read(temp.path().join(".claude").join("settings.json"));
+    assert_eq!(project["permissions"]["allow"], json!(["mcp__airgap__*"]));
+    // Re-running is a no-op and never duplicates the rule.
+    assert!(setup::apply(
+        temp.path(),
+        Some(home.path()),
+        &options,
+        &config(),
+        "airgap"
+    )
+    .unwrap()
+    .is_empty());
+    assert!(setup::merge_claude_permissions(json!({"permissions":{"allow":{}}})).is_err());
+}
+
+#[test]
 fn configured_paths_name_each_client_and_scope_with_native_separators() {
     let temp = tempfile::tempdir().unwrap();
     let home = tempfile::tempdir().unwrap();
@@ -261,7 +343,8 @@ fn rules_only_does_not_read_or_change_editor_configs() {
         editors: Default::default(),
     };
     let paths = setup::apply(temp.path(), None, &options, &config(), "airgap").unwrap();
-    assert_eq!(paths.len(), 2);
+    assert_eq!(paths.len(), 3);
+    assert!(temp.path().join("AGENTS.md").is_file());
     assert_eq!(
         fs::read_to_string(temp.path().join(".mcp.json")).unwrap(),
         "invalid config"

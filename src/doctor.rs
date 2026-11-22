@@ -71,12 +71,12 @@ struct Check {
 fn check_line(check: &Check) {
     if check.ok {
         println!(
-            "  \x1b[32m✓\x1b[0m \x1b[1m{:<18}\x1b[0m \x1b[90m{}\x1b[0m",
+            "  \x1b[32m✓\x1b[0m \x1b[1m{:<24}\x1b[0m \x1b[90m{}\x1b[0m",
             check.label, check.detail
         );
     } else {
         println!(
-            "  \x1b[31m✗\x1b[0m \x1b[1;31m{:<18}\x1b[0m \x1b[31m{}\x1b[0m",
+            "  \x1b[31m✗\x1b[0m \x1b[1;31m{:<24}\x1b[0m \x1b[31m{}\x1b[0m",
             check.label, check.detail
         );
         println!("    \x1b[33m→ {}\x1b[0m", check.remedy);

@@ -6,6 +6,8 @@ pub const DEFAULT_MODEL: &str = "deepseek-ai/DeepSeek-V4.1-Flash";
 pub const DEFAULT_AGENTBOX_BASE_URL: &str = "https://api.gmi-serving.com/v1/agents";
 pub const DEFAULT_MAAS_BASE_URL: &str = "https://api.gmi-serving.com/v1";
 pub const DEFAULT_IDC: &str = "us-central-iowa16";
+/// 2 vCPU / 4 GiB; the 2 GiB small SKU OOM-kills common Node and Rust test runners.
+pub const DEFAULT_INSTANCE_TYPE: &str = "gmi.sandbox.medium";
 
 // Do not derive Debug: this structure holds credentials.
 #[derive(Clone)]
@@ -15,6 +17,7 @@ pub struct Config {
     pub agentbox_base_url: String,
     pub maas_base_url: String,
     pub idc: String,
+    pub instance_type: String,
     pub model: String,
     pub timeout_seconds: u64,
 }
@@ -65,6 +68,8 @@ impl Config {
                 .trim_end_matches('/')
                 .into(),
             idc: get("GMI_DEFAULT_IDC").unwrap_or_else(|| DEFAULT_IDC.into()),
+            instance_type: get("GMI_AGENTBOX_INSTANCE_TYPE")
+                .unwrap_or_else(|| DEFAULT_INSTANCE_TYPE.into()),
             model: get("GMI_MODEL").unwrap_or_else(|| DEFAULT_MODEL.into()),
             timeout_seconds: 120,
         };
@@ -83,6 +88,15 @@ impl Config {
         }
         validate_model(&config.model)?;
         ensure!(!config.idc.trim().is_empty(), "IDC cannot be empty");
+        ensure!(
+            !config.instance_type.is_empty()
+                && config.instance_type.len() <= 100
+                && config
+                    .instance_type
+                    .bytes()
+                    .all(|b| b.is_ascii_alphanumeric() || matches!(b, b'.' | b'-' | b'_')),
+            "invalid GMI_AGENTBOX_INSTANCE_TYPE"
+        );
         Ok(config)
     }
 }

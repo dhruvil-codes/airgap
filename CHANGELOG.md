@@ -20,12 +20,17 @@ Changes are recorded here before a release. Version 0.1.0 in Cargo.toml identifi
 - Autonomous agent routing rules and trigger descriptions guide coding agents to sequence tools automatically upon request ("use airgap", "run tests", "fix issue"), with autonomous fallback to `airgap_sandbox_run` when patch verification returns a provider error.
 - `airgap doctor` displays registered editor configurations with explicit client and scope labels (`Claude (user)`, `Cursor (project)`, etc.) and high-contrast terminal indicators.
 - Deduplicated terminal ASCII art banners across `main`, `setup`, and `doctor` into a unified `airgap::banner` helper.
-- The terminal header is a single line (`🛡️  AIRGAP vX · subtitle`) instead of two-row block letters, which showed gaps in some terminal fonts.
+- The terminal header renders "AIRGAP" in OpenTUI's two-row `tiny` font, with a cyan top row and an indigo bottom row (24-bit color), above a version and subtitle line.
 - `airgap doctor` shows a spinner while network checks run, prints a two-line summary when everything passes, and expands only failed checks with a remedy. `airgap doctor --verbose` (`-v`) lists every check and config path.
+- Setup configures Factory Droid (`.factory/mcp.json` in the workspace and `~/.factory/mcp.json`, `--factory`/`--droid`) and writes the routing block to `AGENTS.md` as well as `.cursorrules` and `CLAUDE.md`.
+- Claude Code setup adds `mcp__airgap__*` to `permissions.allow` in `~/.claude/settings.json` (and `.claude/settings.json` when present), so airgap tools no longer prompt on every call.
+- Sandboxes default to `gmi.sandbox.medium` (4 GiB) instead of `gmi.sandbox.small` (2 GiB); override with `GMI_AGENTBOX_INSTANCE_TYPE`.
+- Sandbox commands use `TMPDIR=/root/tmp` on the root disk instead of the 1 GiB `/tmp` tmpfs, enable Corepack when available, and put `PNPM_HOME` on `PATH`.
 - Upgraded `README.md` to tier-1 open source documentation standards with native Mermaid architecture modeling, host-versus-microVM comparison matrix, and production output cards.
 
 ### Fixed
 
+- `airgap_sandbox_run` no longer reports PASSED when output shows a `Killed`/`SIGKILL` termination or a recognized test summary reports failures, even with exit code 0. Exit code 137 gets an out-of-memory remedy.
 - Normalized Windows path separators in `setup` and `doctor` output to eliminate mixed forward/backward slashes.
 - Base URLs (`GMI_AGENTBOX_BASE_URL`, `GMI_MAAS_BASE_URL`) are read exclusively from process environment variables; repository `.env` values are ignored to prevent malicious repos from exfiltrating credentials.
 - Workspace configuration files (`.mcp.json`, `.cursor/mcp.json`, `.vscode/mcp.json`) no longer receive API keys during setup; keys are restricted to user-level configs (`~/.claude.json`, `~/.cursor/mcp.json`).
