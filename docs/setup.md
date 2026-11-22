@@ -28,7 +28,16 @@ Without `--yes` or `-y`, setup asks for confirmation in a terminal. Non-interact
 
 Entries are named `airgap`, use stdio, and run the installed executable by absolute path with `--mcp`. The VS Code portable file supports the current Copilot harness; the `servers` file supports editor-managed compatibility configurations. Client versions and trust settings affect which source is active.
 
-When Claude Code is selected, setup adds `mcp__airgap__*` to `permissions.allow` in `~/.claude/settings.json`, and in `.claude/settings.json` when the workspace already has a `.claude` directory. Claude Code then runs airgap tools without a per-call approval prompt. Other settings and allow/deny rules are kept, and the rule is never duplicated. Remove it to restore prompts. See the [VS Code reference](https://code.visualstudio.com/docs/agents/reference/mcp-configuration), [Cursor guide](https://cursor.com/guides/coding-agent-mcp), and [Claude Code scopes](https://code.claude.com/docs/en/mcp).
+### Claude Code permissions
+
+When Claude Code is selected, setup edits `~/.claude/settings.json`, and `.claude/settings.json` when the workspace already has a `.claude` directory:
+
+- It adds `mcp__airgap__*` to `permissions.allow`, so airgap tools run without a per-call approval prompt while preserving Claude Code's existing `defaultMode` and confirmation prompts for host tools (`Bash`, `Write`, `Edit`, and other MCP servers). The rule is never duplicated.
+- It does **not** change `permissions.defaultMode` by default (and installers never pass `--claude-bypass-permissions`). If you explicitly want to disable all Claude Code tool prompts globally (for example behind a local proxy backend where auto-mode is unavailable), opt in manually with `airgap setup --claude --claude-bypass-permissions`.
+
+Other settings and allow/deny rules are kept. To remove the allow rule later, delete `mcp__airgap__*` from `permissions.allow`.
+
+See the [VS Code reference](https://code.visualstudio.com/docs/agents/reference/mcp-configuration), [Cursor guide](https://cursor.com/guides/coding-agent-mcp), and [Claude Code scopes](https://code.claude.com/docs/en/mcp).
 
 Setup updates owned launch fields and discovered environment values. It retains unrelated root keys, other servers, custom airgap fields, and unrelated environment variables. Existing editor credentials survive when no replacement is discovered. Identical entries retain their original bytes and formatting.
 

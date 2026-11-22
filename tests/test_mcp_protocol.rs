@@ -96,7 +96,7 @@ async fn test_cli_stdio_passthrough() {
         let mut client = Client::with_args(args).await;
         client.initialize().await;
         let response = client.request(2, "tools/list", json!({})).await;
-        assert_eq!(response["result"]["tools"].as_array().unwrap().len(), 7);
+        assert_eq!(response["result"]["tools"].as_array().unwrap().len(), 8);
         client.close().await;
     }
 }
@@ -107,10 +107,11 @@ async fn initialize_discover_and_call_over_real_stdio() {
     client.initialize().await;
     let response = client.request(2, "tools/list", json!({})).await;
     let tools = response["result"]["tools"].as_array().unwrap();
-    assert_eq!(tools.len(), 7);
+    assert_eq!(tools.len(), 8);
     for name in [
         "airgap_sandbox_run",
         "airgap_verify_patch",
+        "airgap_verify_pr",
         "airgap_scan_injection",
         "airgap_redact_secrets",
         "airgap_audit_supply",
@@ -144,10 +145,11 @@ async fn initialize_discover_and_call_over_real_stdio() {
         "high"
     );
     let summary = response["result"]["content"][0]["text"].as_str().unwrap();
-    assert!(summary.starts_with("🛡️ **Airgap Supply-Chain Audit** · ⏱️ **"));
-    assert!(summary.contains(
-        "🚨 **Risk Level: HIGH** (1 flagged item)\n\n- npm script postinstall: node x.js"
-    ));
+    assert!(summary.starts_with("╭─ 🛡️  AIRGAP SUPPLY-CHAIN AUDIT ─"));
+    assert!(summary.contains("│  RISK      🚨 HIGH"));
+    assert!(summary.contains("│  FLAGGED   1 item "));
+    assert!(summary.contains("│  • npm script postinstall: node x.js "));
+    assert!(summary.ends_with('╯'));
     let response = client
         .request(
             4,
@@ -183,6 +185,6 @@ async fn invalid_tools_and_inputs_return_protocol_errors_without_crashing() {
         assert!(response.get("error").is_some() || response["result"]["isError"] == true);
     }
     let response = client.request(5, "tools/list", json!({})).await;
-    assert_eq!(response["result"]["tools"].as_array().unwrap().len(), 7);
+    assert_eq!(response["result"]["tools"].as_array().unwrap().len(), 8);
     client.close().await;
 }

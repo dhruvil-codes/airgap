@@ -189,6 +189,115 @@ fn unknown_test_output_never_invents_passing_tests() {
         test_counts("=== 1 failed, 2 passed, 1 error in 0.12s ==="),
         (Some(2), Some(2))
     );
+    // Vitest (including ANSI colors)
+    assert_eq!(
+        test_counts(" \x1b[2mTest Files\x1b[22m  1 passed (1)\n \x1b[2m     Tests\x1b[22m  \x1b[32m14 passed\x1b[39m (14)\n"),
+        (Some(14), Some(0))
+    );
+    assert_eq!(
+        test_counts("      Tests  2 failed | 12 passed (14)\n"),
+        (Some(12), Some(2))
+    );
+    // Jest
+    assert_eq!(
+        test_counts("Tests:       1 failed, 9 passed, 10 total\n"),
+        (Some(9), Some(1))
+    );
+    // Node built-in test runner
+    assert_eq!(
+        test_counts("# tests 5\n# pass 5\n# fail 0\n"),
+        (Some(5), Some(0))
+    );
+    // Multi-suite Jest/Vitest aggregation + trailing unrelated `Tests ...` line cannot shadow failures
+    assert_eq!(
+        test_counts(
+            "Tests:       2 failed, 8 passed, 10 total\nTests:       5 passed, 5 total\nTests completed in 3.2s\n"
+        ),
+        (Some(13), Some(2))
+    );
+    // Multi-suite Node built-in test runner aggregation
+    assert_eq!(
+        test_counts("# tests 5\n# pass 4\n# fail 1\n# tests 3\n# pass 3\n# fail 0\n"),
+        (Some(7), Some(1))
+    );
+    // AVA
+    assert_eq!(test_counts("  14 tests passed\n"), (Some(14), Some(0)));
+    assert_eq!(
+        test_counts("  2 tests failed\n  12 tests passed\n"),
+        (Some(12), Some(2))
+    );
+}
+
+#[test]
+fn pr_target_parsing_rejects_non_github_and_traversal() {
+    use airgap::tools::pr::{build_pr_script, parse_pr_target, PrVerifyRequest};
+
+    let req = PrVerifyRequest {
+        pr_url: Some("https://github.com/Nano-Collective/nanocoder/pull/2313/files".into()),
+        repo: None,
+        pr_number: None,
+        test_command: None,
+        build_command: None,
+        build_first: None,
+        image: None,
+        timeout_secs: None,
+        fail_on_supply_risk: true,
+        allow_install_scripts: false,
+    };
+    let target = parse_pr_target(&req).unwrap();
+    assert_eq!(target.owner, "Nano-Collective");
+    assert_eq!(target.repo, "nanocoder");
+    assert_eq!(target.number, 2313);
+
+    for bad_url in [
+        "http://github.com/a/b/pull/1",
+        "https://evil.example/a/b/pull/1",
+        "https://github.com/../b/pull/1",
+        "https://github.com/a/b/pull/0",
+        "https://github.com/a/b/pull/1;rm -rf /",
+    ] {
+        let mut bad = req.clone();
+        bad.pr_url = Some(bad_url.into());
+        assert!(parse_pr_target(&bad).is_err(), "{bad_url} should fail");
+    }
+
+    let script = build_pr_script(
+        &target,
+        "0123456789abcdef0123456789abcdef01234567",
+        &[
+            "source/cli-args.spec.ts".into(),
+            "--config=evil.test.js".into(),
+        ],
+        None,
+        None,
+        None,
+        false,
+        Some("https://cache.example.com"),
+    );
+    assert!(script.contains("git config core.hooksPath /dev/null"));
+    assert!(script.contains("git config core.fsmonitor false"));
+    assert!(script.contains("git config submodule.recurse false"));
+    assert!(script.contains("git config protocol.file.allow never"));
+    assert!(script.contains(
+        "git fetch -q --depth 1 --no-tags --filter=blob:none origin 'pull/2313/head:pr-verify'"
+    ));
+    let verify_pos = script
+        .find("ACTUAL_SHA=\"$(git rev-parse pr-verify)\"")
+        .unwrap();
+    let checkout_pos = script
+        .find("git checkout -q --detach \"$ACTUAL_SHA\"")
+        .unwrap();
+    assert!(
+        verify_pos < checkout_pos,
+        "SHA verification must happen before git checkout"
+    );
+    assert!(script.contains("0123456789abcdef0123456789abcdef01234567"));
+    assert!(script.contains("--ignore-scripts --ignore-pnpmfile"));
+    assert!(script.contains("export YARN_ENABLE_SCRIPTS=false"));
+    assert!(script.contains("vitest run -- 'source/cli-args.spec.ts'"));
+    assert!(!script.contains("--config=evil.test.js"));
+    assert!(script.contains("\"$PM\" run build"));
+    assert!(script.contains("https://cache.example.com"));
 }
 
 #[test]
@@ -228,20 +337,46 @@ fn config_discovery_precedence_and_credential_fallback() {
         "GMI_API_KEY=parent\nGMI_MODEL=parent-model\n",
     )
     .unwrap();
-    std::fs::write(child.join("cloudvet.env"), "GMI_MODEL=child-model\n").unwrap();
+    std::fs::write(
+        child.join("cloudvet.env"),
+        "GMI_AGENTBOX_API_KEY=child-compute\nGMI_MODEL=child-model\n",
+    )
+    .unwrap();
     let environment = BTreeMap::from([("GMI_MAAS_API_KEY".into(), "inference".into())]);
     let config = Config::load(&child, environment).unwrap();
-    assert_eq!(config.model, "child-model");
-    assert_eq!(config.agentbox_key.as_deref(), Some("parent"));
+    // Workspace .env files must never override GMI_MODEL.
+    assert_eq!(config.model, airgap::config::DEFAULT_MODEL);
+    assert_eq!(config.agentbox_key.as_deref(), Some("child-compute"));
     assert_eq!(config.maas_key.as_deref(), Some("inference"));
+
+    // Process fallback credentials (GMI_API_KEY / GH_TOKEN) must strictly win over workspace .env.
+    std::fs::write(
+        child.join(".env"),
+        "GMI_AGENTBOX_API_KEY=attacker-compute\nGMI_MAAS_API_KEY=attacker-maas\nGITHUB_TOKEN=attacker-gh\n",
+    )
+    .unwrap();
+    let environment = BTreeMap::from([
+        ("GMI_API_KEY".into(), "process-gmi".into()),
+        ("GH_TOKEN".into(), "process-gh".into()),
+    ]);
+    let config = Config::load(&child, environment).unwrap();
+    assert_eq!(config.agentbox_key.as_deref(), Some("process-gmi"));
+    assert_eq!(config.maas_key.as_deref(), Some("process-gmi"));
+    assert_eq!(config.github_token.as_deref(), Some("process-gh"));
 }
 
 #[test]
-fn dotenv_cannot_override_provider_base_urls() {
+fn dotenv_cannot_override_provider_base_urls_or_runtime_settings() {
     let temp = tempfile::tempdir().unwrap();
     std::fs::write(
         temp.path().join(".env"),
-        "GMI_AGENTBOX_BASE_URL=https://attacker.example/agents\nGMI_MAAS_BASE_URL=https://attacker.example/v1\nGMI_MODEL=dotenv-model\n",
+        "GMI_AGENTBOX_BASE_URL=https://attacker.example/agents\n\
+         GMI_MAAS_BASE_URL=https://attacker.example/v1\n\
+         AIRGAP_CACHE_URL=https://attacker.example/cache\n\
+         AIRGAP_NODE_IMAGE=attacker.example/evil-node:latest\n\
+         GMI_MODEL=weak-model\n\
+         GMI_AGENTBOX_INSTANCE_TYPE=gmi.sandbox.huge\n\
+         GMI_DEFAULT_IDC=attacker-region\n",
     )
     .unwrap();
     let environment = BTreeMap::from([("GMI_API_KEY".into(), "process-key".into())]);
@@ -251,14 +386,22 @@ fn dotenv_cannot_override_provider_base_urls() {
         airgap::config::DEFAULT_AGENTBOX_BASE_URL
     );
     assert_eq!(config.maas_base_url, airgap::config::DEFAULT_MAAS_BASE_URL);
-    assert_eq!(config.model, "dotenv-model");
+    assert!(config.cache_base_url.is_none());
+    assert_eq!(config.node_image, airgap::config::DEFAULT_NODE_IMAGE);
+    assert_eq!(config.model, airgap::config::DEFAULT_MODEL);
+    assert_eq!(config.instance_type, airgap::config::DEFAULT_INSTANCE_TYPE);
+    assert_eq!(config.idc, airgap::config::DEFAULT_IDC);
 
-    let environment = BTreeMap::from([(
-        "GMI_MAAS_BASE_URL".into(),
-        "https://proxy.example/v1".into(),
-    )]);
+    let environment = BTreeMap::from([
+        (
+            "GMI_MAAS_BASE_URL".into(),
+            "https://proxy.example/v1".into(),
+        ),
+        ("GMI_MODEL".into(), "env-model".into()),
+    ]);
     let config = Config::load(temp.path(), environment).unwrap();
     assert_eq!(config.maas_base_url, "https://proxy.example/v1");
+    assert_eq!(config.model, "env-model");
 }
 
 #[test]

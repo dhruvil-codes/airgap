@@ -51,7 +51,9 @@ pub async fn verify(
         "expected a unified git diff"
     );
     ensure!(
-        !request.test_command.trim().is_empty() && request.test_command.len() <= 64 * 1024,
+        !request.test_command.trim().is_empty()
+            && request.test_command.len() <= 64 * 1024
+            && !request.test_command.contains('\0'),
         "invalid test command"
     );
     ensure!(
@@ -113,6 +115,10 @@ pub fn reports_failed_tests(output: &str) -> bool {
 }
 
 pub fn test_counts(output: &str) -> (Option<u64>, Option<u64>) {
+    static ANSI: LazyLock<Regex> =
+        LazyLock::new(|| Regex::new(r"\x1b\[[0-?]*[ -/]*[@-~]").expect("static regex"));
+    let clean = ANSI.replace_all(output, "");
+
     static SUMMARY: LazyLock<Regex> = LazyLock::new(|| {
         Regex::new(r"(?m)(?:test result: (?:ok|FAILED)\. )?(\d+) passed[;,] (\d+) failed")
             .expect("static regex")
@@ -120,7 +126,7 @@ pub fn test_counts(output: &str) -> (Option<u64>, Option<u64>) {
     let mut passed = 0u64;
     let mut failed = 0u64;
     let mut seen = false;
-    for captures in SUMMARY.captures_iter(output) {
+    for captures in SUMMARY.captures_iter(&clean) {
         if let (Ok(p), Ok(f)) = (captures[1].parse::<u64>(), captures[2].parse::<u64>()) {
             passed = passed.saturating_add(p);
             failed = failed.saturating_add(f);
@@ -130,10 +136,79 @@ pub fn test_counts(output: &str) -> (Option<u64>, Option<u64>) {
     if seen {
         return (Some(passed), Some(failed));
     }
+
+    // Vitest (`Tests  12 passed (12)` / `Tests  2 failed | 10 passed (12)`)
+    // and Jest (`Tests:       2 failed, 10 passed, 12 total`).
+    // Aggregate across every summary line so multi-suite monorepo runs never hide earlier failures,
+    // and unrelated trailing `Tests ...` log lines cannot shadow real summaries.
+    static JS_TESTS_LINE: LazyLock<Regex> =
+        LazyLock::new(|| Regex::new(r"(?m)^\s*Tests:?\s+(.+)$").expect("static regex"));
+    static COUNT_TOKEN: LazyLock<Regex> =
+        LazyLock::new(|| Regex::new(r"\b(\d+)\s+(passed|failed)\b").expect("static regex"));
+    for line in JS_TESTS_LINE
+        .captures_iter(&clean)
+        .filter_map(|c| c.get(1).map(|m| m.as_str()))
+    {
+        for captures in COUNT_TOKEN.captures_iter(line) {
+            if let Ok(count) = captures[1].parse::<u64>() {
+                if &captures[2] == "passed" {
+                    passed = passed.saturating_add(count);
+                } else {
+                    failed = failed.saturating_add(count);
+                }
+                seen = true;
+            }
+        }
+    }
+    if seen {
+        return (Some(passed), Some(failed));
+    }
+
+    // Node built-in test runner (`node --test`): `# pass 12` and `# fail 0`.
+    static NODE_PASS: LazyLock<Regex> =
+        LazyLock::new(|| Regex::new(r"(?m)^#\s+pass\s+(\d+)\s*$").expect("static regex"));
+    static NODE_FAIL: LazyLock<Regex> =
+        LazyLock::new(|| Regex::new(r"(?m)^#\s+fail\s+(\d+)\s*$").expect("static regex"));
+    let mut node_pass_seen = false;
+    let mut node_fail_seen = false;
+    for captures in NODE_PASS.captures_iter(&clean) {
+        if let Ok(count) = captures[1].parse::<u64>() {
+            passed = passed.saturating_add(count);
+            node_pass_seen = true;
+        }
+    }
+    for captures in NODE_FAIL.captures_iter(&clean) {
+        if let Ok(count) = captures[1].parse::<u64>() {
+            failed = failed.saturating_add(count);
+            node_fail_seen = true;
+        }
+    }
+    if node_pass_seen && node_fail_seen {
+        return (Some(passed), Some(failed));
+    }
+
+    // AVA: `  14 tests passed` / `  2 tests failed` (each on its own summary line).
+    static AVA_SUMMARY: LazyLock<Regex> = LazyLock::new(|| {
+        Regex::new(r"(?m)^\s*(\d+)\s+tests?\s+(passed|failed)\s*$").expect("static regex")
+    });
+    for captures in AVA_SUMMARY.captures_iter(&clean) {
+        if let Ok(count) = captures[1].parse::<u64>() {
+            if &captures[2] == "passed" {
+                passed = passed.saturating_add(count);
+            } else {
+                failed = failed.saturating_add(count);
+            }
+            seen = true;
+        }
+    }
+    if seen {
+        return (Some(passed), Some(failed));
+    }
+
     // Pytest emits either count independently on its final summary line.
     static PYTEST: LazyLock<Regex> =
         LazyLock::new(|| Regex::new(r"(\d+) (passed|failed|errors?)\b").expect("static regex"));
-    if let Some(line) = output.lines().rev().find(|line| {
+    if let Some(line) = clean.lines().rev().find(|line| {
         line.contains(" in ")
             && (line.contains(" passed") || line.contains(" failed") || line.contains(" error"))
     }) {

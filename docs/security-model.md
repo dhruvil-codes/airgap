@@ -12,6 +12,7 @@ GMI sandboxes have outbound internet. This project does not implement an offline
 | --- | --- |
 | Sandbox execution | Explicit file contents, selected image and command |
 | Patch verification | Base snapshot, diff and test command |
+| PR verification (`airgap_verify_pr`) | Redacted PR title/body to GMI MaaS; shallow-clone/test script to GMI AgentBox (`GITHUB_TOKEN` stays host-only) |
 | Injection scan | Submitted text and optional source label |
 | Repository audit | Heuristically redacted source, fixed inventory output and prior review data |
 | Local secret and supply scanners | Nothing |
@@ -20,22 +21,22 @@ Sandbox and verification snapshots are uploaded unchanged. Do not submit secrets
 
 ## Host-side controls
 
-The explicit `setup`/`init` commands write local editor configuration and routing instructions, separate from MCP mode. They can store discovered keys in workspace and user config files. See [setup credential handling](setup.md#credentials). Symlinked config files and immediate parent directories are refused rather than redirecting credential writes.
+The explicit `setup`/`init` commands write local editor configuration and routing instructions, separate from MCP mode. Discovered keys are stored only in user-level editor config files, never workspace files. See [setup credential handling](setup.md#credentials). Symlinked config files and immediate parent directories are refused rather than redirecting credential writes.
 
 - Snapshot paths must be relative, with no traversal, Windows drive prefixes, control characters or `.git` metadata. Files are regular UTF-8 entries with mode 0644.
 - Snapshot size, file count, command length, scanner input and provider response size are bounded.
 - Provider configuration requires HTTPS. Redirects and automatic proxies are disabled.
-- Cloud requests and executions have deadlines. Sandbox lifetimes are explicit and cleanup is awaited.
+- Cloud requests and executions have deadlines. Sandbox lifetimes are explicit, caller cancellation aborts execution immediately, and cleanup is awaited.
 - Provider errors omit raw response bodies. Returned logs receive heuristic redaction and exact replacement of configured provider keys.
 - Contradictory classifier output, missing exit codes and invalid model JSON cannot become successful verification.
 
-These controls are enforced by this client. Image trust, sandbox isolation, network egress, provider retention and account authorization remain separate responsibilities.
+These controls are enforced by this client. Image trust, sandbox isolation, network egress (including cloud metadata endpoints such as `169.254.169.254`), provider retention and account authorization remain separate responsibilities of the sandbox provider.
 
 ## Residual risks
 
-Environment-file discovery is a trusted configuration mechanism. Start the server from a directory you trust; discovered files can select credentials, models and provider destinations.
+Environment-file discovery is a trusted configuration mechanism. Start the server from a directory you trust; `.env` files cannot override provider URLs, container images, compute SKUs, regions, or the classifier model, and process credentials strictly take precedence over `.env` files.
 
-Forced termination, an outage or a lost create response can prevent cleanup. Sandbox expiry bounds sandbox lifetime, but abandoned templates may need console cleanup. A client cancellation alone does not cancel the cleanup worker.
+Forced termination, an outage or a lost create response can prevent cleanup. Sandbox expiry bounds sandbox lifetime. Deployment templates are kept on purpose for reuse; they hold only the public base image and start command, never uploaded files. Delete `airgap-*` templates in the console to reclaim them. A client cancellation aborts in-flight execution while still allowing the cleanup worker to delete the remote task.
 
 Secret scanners can miss credentials and redact harmless text. Manifest checks are heuristics without package-source, transitive-dependency or advisory analysis. Model classifiers and audits can produce false positives or false negatives. Never use those outputs as authorization to disclose data or perform sensitive actions.
 

@@ -17,7 +17,7 @@ flowchart LR
 
 `main.rs` loads configuration, creates the shared HTTP client and serves MCP over stdio. The tool router defines the seven public tools and their generated input schemas. No provider call occurs during startup.
 
-Local scanners return results directly. Cloud tools validate the input, take a bounded concurrency slot and call the appropriate provider. AgentBox jobs upload an in-memory archive, execute inside `/workspace`, collect output and delete their sandbox before deleting the template. A tracked task keeps cleanup alive when the MCP caller cancels.
+Local scanners return results directly. Cloud tools validate the input, take a bounded concurrency slot and call the appropriate provider. AgentBox jobs upload an in-memory archive, execute inside `/workspace`, collect output and delete their sandbox. Templates are reused across runs with the same image and instance type and are not deleted. A tracked task keeps cleanup alive when the MCP caller cancels.
 
 Runtime model and timeout settings are snapshotted for each request. Updating defaults does not change credentials or provider destinations and does not rewrite a running job's settings.
 

@@ -1,8 +1,26 @@
 # Changelog
 
-Changes are recorded here before a release. Version 0.1.0 in Cargo.toml identifies the initial development version; it is not evidence of a published release.
+Changes are recorded here before each release.
 
-## Unreleased
+## [0.2.0] - 2026-11-22
+
+### Added
+
+- `airgap_verify_pr`: native 1-shot GitHub PR verification engine with parallel host security gates (`airgap_scan_injection` + manifest supply-chain audit), shallow remote git checkout (`git fetch --depth 1`), auto-build detection, and OpenTUI terminal summary cards.
+- Pre-checkout TOCTOU force-push protection verifying `git rev-parse pr-verify` against the audited `head_sha` before running `git checkout --detach` inside the microVM, hardened with `core.hooksPath=/dev/null`, `core.fsmonitor=false`, `submodule.recurse=false`, and `protocol.file.allow=never`.
+- Extended test runner parsers for Vitest, Jest, Node built-in test runner (`node --test`), and AVA, with multi-suite aggregation across all summary lines.
+- Warm GMI AgentBox template reuse with detail-endpoint fallback lookup (`GET /deployments/{slug}`) and in-process mutex deduplication to prevent duplicate template races.
+- Explicit `--claude-bypass-permissions` opt-in flag in `airgap setup` for users who intentionally want `permissions.defaultMode: "bypassPermissions"`.
+
+### Security & Hardening
+
+- **Claude Code permissions scoped by default (C-1)**: `airgap setup` and installers now add only `mcp__airgap__*` to `permissions.allow` and never modify `permissions.defaultMode` unless `--claude-bypass-permissions` is explicitly passed. Workspace MCP configs also strip leaked `GMI_API_KEY`, `GITHUB_TOKEN`, and `GH_TOKEN` entries.
+- **Fail-closed PR manifest auditing & pagination (H-1, M-1)**: `airgap_verify_pr` paginates `/files` up to 3 pages (300 files), fails closed if >300 files or >10 manifests are touched, skips only `"removed"` files, percent-encodes manifest path segments with `reqwest::Url`, fails closed on manifest fetch/size/encoding errors, and returns an actionable error on GitHub HTTP 429 or HTTP 403 rate limits (`x-ratelimit-remaining: 0`).
+- **Workspace `.env` protection (H-2)**: `.env` and `cloudvet.env` files can no longer override `AIRGAP_NODE_IMAGE`, `GMI_MODEL`, `GMI_AGENTBOX_INSTANCE_TYPE`, or `GMI_DEFAULT_IDC`, and process fallback credentials (`GMI_API_KEY`, `GH_TOKEN`) strictly take precedence over `.env` files.
+- **Package-manager & script hardening (H-3, M-2)**: `pnpm install` passes `--ignore-scripts --ignore-pnpmfile`, Yarn exports `YARN_ENABLE_SCRIPTS=false`, high-risk hook/config files (`.pnpmfile.cjs`, `.yarnrc.yml`, `.npmrc`, `.cargo/config.toml`, `setup.py`, `build.rs`) are flagged during PR audits, commands reject NUL (`\0`) bytes, and targeted JS test runners insert `--` before test paths.
+- **Immediate cleanup on cancelled MCP calls (H-4)**: `AgentBox::run` and `run_script` wire per-job `CancellationToken` drop guards so cancelled requests immediately abort execution, delete `/tasks/{id}`, and release semaphore permits.
+
+## [0.1.0] - Initial Development
 
 ### Added
 
@@ -16,7 +34,9 @@ Changes are recorded here before a release. Version 0.1.0 in Cargo.toml identifi
 
 ### Changed
 
-- MCP tool text output for sandbox runs, patch verification, supply-chain audit, secret redaction and injection scans is compact Markdown (verdict, duration, environment and host-protection note) instead of ASCII banners and box frames. `structuredContent` is unchanged; ASCII art remains only in terminal commands.
+- GMI AgentBox deployment templates are cached and reused. Each run looks up a ready template named `airgap-{image}-{instance_type}` with `GET /deployments` and creates one only when none is ready. Cleanup deletes only the sandbox task, so warm runs skip the multi-minute template build (about 98% less startup latency on a warm template).
+- `airgap_sandbox_run`, `airgap_verify_patch` and `airgap_audit_supply` render box-drawn terminal cards (`╭─`, `│`, `├─`, `╰─`) with status badges, compute and image fields, and a pass-rate progress bar for patch verification. Command output is stripped of ANSI escapes and control characters and wrapped to the card width. Secret redaction and injection scans keep their compact Markdown cards.
+- MCP tool text output for secret redaction and injection scans is compact Markdown (verdict, duration and host-protection note) instead of ASCII banners and box frames; sandbox, patch verification and supply-chain output use the box-drawn cards described above. `structuredContent` is unchanged; ASCII art remains only in terminal commands.
 - Autonomous agent routing rules and trigger descriptions guide coding agents to sequence tools automatically upon request ("use airgap", "run tests", "fix issue"), with autonomous fallback to `airgap_sandbox_run` when patch verification returns a provider error.
 - `airgap doctor` displays registered editor configurations with explicit client and scope labels (`Claude (user)`, `Cursor (project)`, etc.) and high-contrast terminal indicators.
 - Deduplicated terminal ASCII art banners across `main`, `setup`, and `doctor` into a unified `airgap::banner` helper.
@@ -30,6 +50,7 @@ Changes are recorded here before a release. Version 0.1.0 in Cargo.toml identifi
 
 ### Fixed
 
+- A terminal AgentBox execution with a null `exit_code` (timed out, cancelled or errored) no longer fails the tool call with `terminal execution has no exit code`. It reports exit code 124 (`timed_out`), 130 (`cancelled`/`canceled`) or -1, and is never marked passed. Out-of-range exit codes also map to -1.
 - `airgap_sandbox_run` no longer reports PASSED when output shows a `Killed`/`SIGKILL` termination or a recognized test summary reports failures, even with exit code 0. Exit code 137 gets an out-of-memory remedy.
 - Normalized Windows path separators in `setup` and `doctor` output to eliminate mixed forward/backward slashes.
 - Base URLs (`GMI_AGENTBOX_BASE_URL`, `GMI_MAAS_BASE_URL`) are read exclusively from process environment variables; repository `.env` values are ignored to prevent malicious repos from exfiltrating credentials.
@@ -39,7 +60,7 @@ Changes are recorded here before a release. Version 0.1.0 in Cargo.toml identifi
 - Explicit `password` and `passwd` keys are always redacted regardless of length, preserving coverage for short passwords while leaving harmless numeric settings untouched.
 - Sandbox summary verdict requires provider `passed == true` and `exit_code == 0`, preventing false "PASSED" reports on timed-out or cancelled runs.
 - Repository audit verifies that serialized snapshot size is within the 2 MiB limit before starting any billable AgentBox inventory microVM.
-- AgentBox cleanup deletes tasks and deployment templates independently; successful execution outputs are retained with a `cleanup_warning` if remote teardown fails.
+- AgentBox cleanup failures keep successful execution outputs and add a `cleanup_warning`.
 - Verify summary reports both zero passed and nonzero failed test counts concurrently.
 
 ### Known limitations

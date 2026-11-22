@@ -17,6 +17,7 @@ fn options(editors: &[Editor]) -> Options {
     Options {
         yes: true,
         rules_only: false,
+        claude_bypass_permissions: false,
         editors: editors.iter().copied().collect(),
     }
 }
@@ -147,6 +148,8 @@ fn claude_settings_allow_airgap_tools_and_keep_existing_rules() {
         user["permissions"]["allow"],
         json!(["Bash(ls:*)", "mcp__airgap__*"])
     );
+    // Default setup must NEVER enable bypassPermissions globally.
+    assert!(user["permissions"].get("defaultMode").is_none());
     // No workspace .claude directory, so no project settings are created.
     assert!(!temp.path().join(".claude").exists());
 
@@ -161,6 +164,7 @@ fn claude_settings_allow_airgap_tools_and_keep_existing_rules() {
     .unwrap();
     let project = read(temp.path().join(".claude").join("settings.json"));
     assert_eq!(project["permissions"]["allow"], json!(["mcp__airgap__*"]));
+    assert!(project["permissions"].get("defaultMode").is_none());
     // Re-running is a no-op and never duplicates the rule.
     assert!(setup::apply(
         temp.path(),
@@ -171,7 +175,49 @@ fn claude_settings_allow_airgap_tools_and_keep_existing_rules() {
     )
     .unwrap()
     .is_empty());
-    assert!(setup::merge_claude_permissions(json!({"permissions":{"allow":{}}})).is_err());
+    assert!(setup::merge_claude_permissions(json!({"permissions":{"allow":{}}}), false).is_err());
+}
+
+#[test]
+fn claude_permissions_preserve_default_mode_unless_bypass_flag_is_explicit() {
+    // Without bypass_permissions, existing defaultMode is preserved and never overwritten.
+    let preserved = setup::merge_claude_permissions(
+        json!({
+            "permissions":{"defaultMode":"auto","deny":["Read(.env)"],"allow":["mcp__airgap__*"]}
+        }),
+        false,
+    )
+    .unwrap();
+    assert_eq!(preserved["permissions"]["defaultMode"], "auto");
+    assert_eq!(preserved["permissions"]["deny"], json!(["Read(.env)"]));
+    assert_eq!(preserved["permissions"]["allow"], json!(["mcp__airgap__*"]));
+
+    let fresh = setup::merge_claude_permissions(json!({}), false).unwrap();
+    assert_eq!(fresh, json!({"permissions":{"allow":["mcp__airgap__*"]}}));
+
+    // Only explicit opt-in sets defaultMode to bypassPermissions.
+    let opted_in = setup::merge_claude_permissions(
+        json!({"permissions":{"defaultMode":"auto","deny":["Read(.env)"]}}),
+        true,
+    )
+    .unwrap();
+    assert_eq!(opted_in["permissions"]["defaultMode"], "bypassPermissions");
+    assert_eq!(opted_in["permissions"]["deny"], json!(["Read(.env)"]));
+    assert_eq!(opted_in["permissions"]["allow"], json!(["mcp__airgap__*"]));
+
+    let parsed_default = Options::parse(&["--yes".into(), "--claude".into()]).unwrap();
+    assert!(!parsed_default.claude_bypass_permissions);
+    let parsed_bypass = Options::parse(&[
+        "--yes".into(),
+        "--claude".into(),
+        "--claude-bypass-permissions".into(),
+    ])
+    .unwrap();
+    assert!(parsed_bypass.claude_bypass_permissions);
+
+    for invalid in [json!([]), json!({"permissions":[]})] {
+        assert!(setup::merge_claude_permissions(invalid, false).is_err());
+    }
 }
 
 #[test]
@@ -322,6 +368,7 @@ fn routing_rules_trigger_on_use_airgap_and_run_requests() {
     assert!(rules.contains("'use airgap'"));
     assert!(rules.contains("without waiting for explicit tool names"));
     for tool in [
+        "airgap_verify_pr",
         "airgap_scan_injection",
         "airgap_audit_supply",
         "airgap_sandbox_run",
@@ -340,6 +387,7 @@ fn rules_only_does_not_read_or_change_editor_configs() {
     let options = Options {
         yes: true,
         rules_only: true,
+        claude_bypass_permissions: false,
         editors: Default::default(),
     };
     let paths = setup::apply(temp.path(), None, &options, &config(), "airgap").unwrap();
