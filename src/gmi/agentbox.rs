@@ -57,6 +57,25 @@ impl AgentBox {
         }
     }
 
+    /// Returns a lightweight tenant-scoped handle sharing the HTTP client, shutdown
+    /// lifecycle, and active-job tracker while isolating credentials, concurrency
+    /// slots, and template build coordination.
+    pub fn scoped(
+        &self,
+        config: Arc<Config>,
+        slots: Arc<Semaphore>,
+        template_lock: Arc<Mutex<()>>,
+    ) -> Self {
+        Self {
+            client: self.client.clone(),
+            config,
+            jobs: self.jobs.clone(),
+            shutdown: self.shutdown.clone(),
+            slots,
+            template_lock,
+        }
+    }
+
     pub async fn shutdown(&self) {
         self.shutdown.cancel();
         self.jobs.close();

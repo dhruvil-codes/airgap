@@ -195,6 +195,7 @@ Read the [threat model](docs/security-model.md) and the [security policy](SECURI
 ## Documentation
 
 - [Setup, installers and doctor](docs/setup.md)
+- [Public hosting and remote HTTP deployment](docs/hosting.md)
 - [Tool and configuration reference](docs/reference.md)
 - [Architecture and source map](docs/architecture.md)
 - [Threat model](docs/security-model.md)

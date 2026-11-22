@@ -13,8 +13,10 @@ categories = ["command-line-utilities", "development-tools"]
 include = ["src/**", "tests/**", "docs/**", "examples/**", "scripts/**", "Cargo.toml", "Cargo.lock", "README.md", "CHANGELOG.md", "CONTRIBUTING.md", "CODE_OF_CONDUCT.md", "SECURITY.md", "LICENSE-*", ".env.example"]
 
 [dependencies]
-rmcp = { version = "3.10", default-features = false, features = ["server", "macros", "schemars", "transport-io"] }
-tokio = { version = "1.40", features = ["rt-multi-thread", "macros", "io-std", "signal", "time", "sync"] }
+rmcp = { version = "3.10", default-features = false, features = ["server", "macros", "schemars", "transport-io", "transport-streamable-http-server"] }
+axum = { version = "0.8", default-features = false, features = ["http1", "http2", "tokio", "json"] }
+http = "1"
+tokio = { version = "1.40", features = ["rt-multi-thread", "macros", "io-std", "net", "signal", "time", "sync"] }
 tokio-util = { version = "0.7", features = ["rt"] }
 reqwest = { version = "0.12", default-features = false, features = ["json", "rustls-tls", "multipart", "http2"] }
 serde = { version = "1", features = ["derive"] }

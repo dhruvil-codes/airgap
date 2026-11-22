@@ -28,6 +28,16 @@ impl Maas {
         }
     }
 
+    /// Returns a tenant-scoped handle sharing the HTTP connection pool while
+    /// isolating credentials and per-tenant concurrency slots.
+    pub fn scoped(&self, config: Arc<Config>, slots: Arc<Semaphore>) -> Self {
+        Self {
+            client: self.client.clone(),
+            config,
+            slots,
+        }
+    }
+
     pub async fn json<T: DeserializeOwned>(
         &self,
         model: &str,

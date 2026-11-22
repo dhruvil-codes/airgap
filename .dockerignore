@@ -1,0 +1,41 @@
+# Build artifacts & local state
+target/
+dist/
+.artifacts/
+.worktrees/
+*.log
+
+# Version control
+.git/
+.github/
+.gitignore
+.gitattributes
+
+# Local secrets — never copy credentials into container images
+.env
+.env.*
+!.env.example
+cloudvet.env
+*.env
+
+# Local editor and agent configurations
+.cursor/
+.claude/
+.vscode/
+.factory/
+.mcp.json
+.cursorrules
+CLAUDE.md
+AGENTS.md
+
+# Non-runtime documentation & tests
+docs/
+examples/
+scripts/
+tests/
+CHANGELOG.md
+CONTRIBUTING.md
+CODE_OF_CONDUCT.md
+SECURITY.md
+VALIDATION.md
+README.md

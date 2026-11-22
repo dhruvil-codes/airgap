@@ -5,6 +5,20 @@ fn main() -> anyhow::Result<()> {
     let args: Vec<_> = std::env::args().skip(1).collect();
     match args.first().map(String::as_str) {
         Some("init" | "setup") => return setup::run(&args[1..]),
+        Some("serve") => {
+            if matches!(
+                args.get(1).map(String::as_str),
+                Some("--help" | "-h" | "help")
+            ) && args.len() == 2
+            {
+                airgap::serve::print_help();
+                return Ok(());
+            }
+            let runtime = tokio::runtime::Builder::new_multi_thread()
+                .enable_all()
+                .build()?;
+            return runtime.block_on(airgap::serve::run(&args[1..], shutdown_signal()));
+        }
         Some("doctor")
             if args[1..]
                 .iter()
@@ -18,7 +32,7 @@ fn main() -> anyhow::Result<()> {
         }
         Some("--help" | "-h" | "help") if args.len() == 1 => {
             let banner = airgap::banner("security boundary for AI coding agents");
-            println!("{banner}\nUsage: airgap [--mcp]\n       airgap init|setup [options]\n       airgap doctor [--verbose|-v]\n       airgap --version\n\nNo arguments or --mcp: serve MCP JSON-RPC over stdio.\ninit/setup: configure editors and agent routing rules.\ndoctor: check credentials, gateways, model access and editor registration.\n\nRun airgap setup --help for setup options.");
+            println!("{banner}\nUsage: airgap [--mcp]\n       airgap serve [options]\n       airgap init|setup [options]\n       airgap doctor [--verbose|-v]\n       airgap --version\n\nNo arguments or --mcp: serve MCP JSON-RPC over stdio.\nserve: run native Streamable HTTP / SSE MCP server for remote/cloud hosting.\ninit/setup: configure editors and agent routing rules.\ndoctor: check credentials, gateways, model access and editor registration.\n\nRun airgap setup --help or airgap serve --help for options.");
             return Ok(());
         }
         Some("--version" | "-v" | "-V") if args.len() == 1 => {

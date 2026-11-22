@@ -15,7 +15,9 @@ use regex::Regex;
 
 use rmcp::{
     handler::server::{router::tool::ToolRouter, wrapper::Parameters},
-    model::{CallToolResult, ContentBlock, Implementation, ServerCapabilities, ServerConfig},
+    model::{
+        CallToolResult, ContentBlock, Extensions, Implementation, ServerCapabilities, ServerConfig,
+    },
     tool, tool_handler, tool_router, ServerHandler,
 };
 use serde::Serialize;
@@ -26,37 +28,67 @@ use crate::{
         agentbox::{detect_image, AgentBox},
         maas::Maas,
     },
+    tenant::{TenantContext, TenantRegistry, DEFAULT_SLOTS_PER_TENANT},
 };
 use config_tool::{ConfigureRequest, RuntimeConfig};
 
 #[derive(Clone)]
 pub struct Airgap {
     tool_router: ToolRouter<Self>,
+    base_config: Arc<Config>,
     agentbox: AgentBox,
     maas: Maas,
     http: reqwest::Client,
     github_token: Option<String>,
     runtime: Arc<RwLock<RuntimeConfig>>,
+    tenants: TenantRegistry,
     instance_type: String,
+}
+
+struct RequestScope {
+    agentbox: AgentBox,
+    maas: Maas,
+    github_token: Option<String>,
+    runtime: Arc<RwLock<RuntimeConfig>>,
+}
+
+impl RequestScope {
+    fn settings(&self) -> RuntimeConfig {
+        self.runtime
+            .read()
+            .unwrap_or_else(|poison| poison.into_inner())
+            .clone()
+    }
 }
 
 impl Airgap {
     pub fn new(config: Config) -> anyhow::Result<Self> {
+        Self::with_tenant_isolation(config, DEFAULT_SLOTS_PER_TENANT)
+    }
+
+    pub fn with_tenant_isolation(
+        config: Config,
+        max_slots_per_tenant: usize,
+    ) -> anyhow::Result<Self> {
         let client = crate::gmi::http_client()?;
-        let runtime = Arc::new(RwLock::new(RuntimeConfig {
+        let base_runtime = RuntimeConfig {
             model: config.model.clone(),
             timeout_seconds: config.timeout_seconds,
-        }));
+        };
+        let runtime = Arc::new(RwLock::new(base_runtime.clone()));
+        let tenants = TenantRegistry::new(base_runtime, max_slots_per_tenant);
         let instance_type = config.instance_type.clone();
         let github_token = config.github_token.clone();
         let config = Arc::new(config);
         Ok(Self {
             tool_router: Self::tool_router(),
+            base_config: config.clone(),
             agentbox: AgentBox::new(client.clone(), config.clone()),
             maas: Maas::new(client.clone(), config),
             http: client,
             github_token,
             runtime,
+            tenants,
             instance_type,
         })
     }
@@ -65,11 +97,50 @@ impl Airgap {
         self.agentbox.shutdown().await;
     }
 
-    fn settings(&self) -> RuntimeConfig {
-        self.runtime
-            .read()
-            .unwrap_or_else(|poison| poison.into_inner())
-            .clone()
+    fn scope(&self, extensions: &Extensions) -> RequestScope {
+        let tenant = extensions
+            .get::<http::request::Parts>()
+            .and_then(|parts| parts.extensions.get::<TenantContext>());
+        let Some(tenant) = tenant else {
+            return RequestScope {
+                agentbox: self.agentbox.clone(),
+                maas: self.maas.clone(),
+                github_token: self.github_token.clone(),
+                runtime: self.runtime.clone(),
+            };
+        };
+
+        let handles = self.tenants.handles(&tenant.tenant_id);
+        let mut config = (*self.base_config).clone();
+        let is_byok_compute = tenant.require_byok || tenant.agentbox_key.is_some();
+        if tenant.require_byok {
+            config.agentbox_key = tenant.agentbox_key.clone();
+            config.maas_key = tenant.maas_key.clone();
+            config.github_token = tenant.github_token.clone();
+        } else {
+            if tenant.agentbox_key.is_some() {
+                config.agentbox_key = tenant.agentbox_key.clone();
+            }
+            if tenant.maas_key.is_some() {
+                config.maas_key = tenant.maas_key.clone();
+            }
+            if tenant.github_token.is_some() {
+                config.github_token = tenant.github_token.clone();
+            }
+        }
+        let template_lock = self
+            .tenants
+            .template_lock(config.agentbox_key.as_deref(), is_byok_compute);
+        let github_token = config.github_token.clone();
+        let config = Arc::new(config);
+        RequestScope {
+            agentbox: self
+                .agentbox
+                .scoped(config.clone(), handles.agentbox_slots, template_lock),
+            maas: self.maas.scoped(config, handles.maas_slots),
+            github_token,
+            runtime: handles.runtime,
+        }
     }
 }
 
@@ -80,17 +151,20 @@ impl Airgap {
     )]
     async fn airgap_sandbox_run(
         &self,
+        extensions: Extensions,
         Parameters(request): Parameters<sandbox::SandboxRequest>,
     ) -> CallToolResult {
         let started = Instant::now();
-        let settings = self.settings();
+        let scope = self.scope(&extensions);
+        let settings = scope.settings();
         let files = request.files.unwrap_or_default();
         let environment = request
             .image
             .clone()
             .unwrap_or_else(|| detect_image(&files).into());
         summarized(
-            self.agentbox
+            scope
+                .agentbox
                 .run(
                     request.command,
                     files,
@@ -111,15 +185,17 @@ impl Airgap {
     )]
     async fn airgap_verify_patch(
         &self,
+        extensions: Extensions,
         Parameters(request): Parameters<sandbox::VerifyRequest>,
     ) -> CallToolResult {
         let started = Instant::now();
+        let scope = self.scope(&extensions);
         let environment = request
             .image
             .clone()
             .unwrap_or_else(|| detect_image(&request.files).into());
         summarized(
-            sandbox::verify(&self.agentbox, request, self.settings().timeout_seconds).await,
+            sandbox::verify(&scope.agentbox, request, scope.settings().timeout_seconds).await,
             Summary::Verify {
                 environment,
                 instance_type: self.instance_type.clone(),
@@ -133,13 +209,15 @@ impl Airgap {
     )]
     async fn airgap_scan_injection(
         &self,
+        extensions: Extensions,
         Parameters(request): Parameters<injection::InjectionRequest>,
     ) -> CallToolResult {
         let started = Instant::now();
-        let settings = self.settings();
+        let scope = self.scope(&extensions);
+        let settings = scope.settings();
         summarized(
             injection::scan(
-                &self.maas,
+                &scope.maas,
                 &settings.model,
                 settings.timeout_seconds,
                 request,
@@ -181,9 +259,11 @@ impl Airgap {
     )]
     fn airgap_configure(
         &self,
+        extensions: Extensions,
         Parameters(request): Parameters<ConfigureRequest>,
     ) -> CallToolResult {
-        let mut settings = self
+        let scope = self.scope(&extensions);
+        let mut settings = scope
             .runtime
             .write()
             .unwrap_or_else(|poison| poison.into_inner());
@@ -195,16 +275,18 @@ impl Airgap {
     )]
     async fn airgap_verify_pr(
         &self,
+        extensions: Extensions,
         Parameters(request): Parameters<pr::PrVerifyRequest>,
     ) -> CallToolResult {
         let started = Instant::now();
-        let settings = self.settings();
+        let scope = self.scope(&extensions);
+        let settings = scope.settings();
         summarized(
             pr::verify_pr(
                 &self.http,
-                self.github_token.as_deref(),
-                &self.agentbox,
-                &self.maas,
+                scope.github_token.as_deref(),
+                &scope.agentbox,
+                &scope.maas,
                 &settings.model,
                 settings.timeout_seconds,
                 request,
@@ -222,13 +304,15 @@ impl Airgap {
     )]
     async fn airgap_audit_repo(
         &self,
+        extensions: Extensions,
         Parameters(request): Parameters<audit::AuditRequest>,
     ) -> CallToolResult {
-        let settings = self.settings();
+        let scope = self.scope(&extensions);
+        let settings = scope.settings();
         result(
             audit::audit(
-                &self.agentbox,
-                &self.maas,
+                &scope.agentbox,
+                &scope.maas,
                 &settings.model,
                 settings.timeout_seconds,
                 request,

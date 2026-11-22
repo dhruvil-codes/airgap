@@ -2,7 +2,9 @@ pub mod config;
 pub mod doctor;
 pub mod gmi;
 pub mod receipt;
+pub mod serve;
 pub mod setup;
+pub mod tenant;
 pub mod tools;
 
 /// Terminal-only header for help, setup and doctor; never sent over MCP.
