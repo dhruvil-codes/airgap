@@ -33,7 +33,7 @@ fn default_true() -> bool {
 #[derive(Debug, Clone, Deserialize, Serialize, schemars::JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct PrVerifyRequest {
-    /// Full GitHub pull request URL, e.g. "https://github.com/Nano-Collective/nanocoder/pull/2313".
+    /// Full GitHub pull request URL, e.g. "<https://github.com/Nano-Collective/nanocoder/pull/2313>".
     pub pr_url: Option<String>,
     /// GitHub repository in "owner/repo" format (required with `pr_number` if `pr_url` is omitted).
     pub repo: Option<String>,
