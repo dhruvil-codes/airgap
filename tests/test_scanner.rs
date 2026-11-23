@@ -294,12 +294,265 @@ fn pr_target_parsing_rejects_non_github_and_traversal() {
     assert!(script.contains("0123456789abcdef0123456789abcdef01234567"));
     assert!(script.contains("--ignore-scripts --ignore-pnpmfile"));
     assert!(script.contains("export YARN_ENABLE_SCRIPTS=false"));
-    assert!(script.contains("vitest run -- 'source/cli-args.spec.ts'"));
+    assert!(script.contains(
+        "if [ -f 'source/cli-args.spec.ts' ]; then set -- \"$@\" 'source/cli-args.spec.ts'; fi"
+    ));
+    assert!(script.contains("exec \"$PM\" exec vitest run -- \"$@\""));
     assert!(!script.contains("--config=evil.test.js"));
     assert!(script.contains("\"$PM\" run build"));
     assert!(script.contains("https://cache.example.com"));
 }
 
+fn pr_script_for(files: &[&str]) -> String {
+    use airgap::tools::pr::{build_pr_script, PrTarget};
+
+    let target = PrTarget {
+        owner: "o".into(),
+        repo: "r".into(),
+        number: 7,
+    };
+    let files: Vec<String> = files.iter().map(|f| (*f).to_owned()).collect();
+    build_pr_script(
+        &target,
+        "0123456789abcdef0123456789abcdef01234567",
+        &files,
+        None,
+        None,
+        None,
+        false,
+        None,
+    )
+}
+
+#[test]
+fn test_targets_pair_sources_with_sibling_tests() {
+    use airgap::tools::pr::resolve_test_targets;
+
+    let files: Vec<String> = [
+        "source/models/models-dev-client.ts",
+        "source/cli-args.spec.ts",
+        "src/ui/button.jsx",
+        "test/smoke.js",
+        "pkg/parser.py",
+        "pkg/test_lexer.py",
+        "tests/api_test.py",
+        "tests/integration_http.rs",
+        "README.md",
+        "docs/guide.md",
+    ]
+    .iter()
+    .map(|f| (*f).to_owned())
+    .collect();
+    let targets = resolve_test_targets(&files);
+
+    assert!(!targets.is_full_suite());
+    assert_eq!(
+        targets.js_tests,
+        vec!["source/cli-args.spec.ts", "test/smoke.js"]
+    );
+    let sources: Vec<&str> = targets
+        .js_sources
+        .iter()
+        .map(|s| s.source.as_str())
+        .collect();
+    assert_eq!(
+        sources,
+        vec!["source/models/models-dev-client.ts", "src/ui/button.jsx"]
+    );
+    assert_eq!(
+        targets.js_sources[0].candidates,
+        vec![
+            "source/models/models-dev-client.spec.ts",
+            "source/models/models-dev-client.spec.tsx",
+            "source/models/models-dev-client.test.ts",
+            "source/models/models-dev-client.test.tsx",
+        ]
+    );
+    assert!(targets.js_sources[1]
+        .candidates
+        .iter()
+        .any(|c| c == "src/ui/button.test.mjs"));
+    assert_eq!(
+        targets.py_tests,
+        vec!["pkg/test_lexer.py", "tests/api_test.py"]
+    );
+    assert_eq!(
+        targets.py_sources[0].candidates,
+        vec![
+            "pkg/test_parser.py",
+            "pkg/parser_test.py",
+            "tests/test_parser.py"
+        ]
+    );
+    assert_eq!(targets.cargo_integration_tests, vec!["integration_http"]);
+    assert!(!targets.rust_sources_changed);
+
+    // A source whose sibling test is itself in the PR is not run twice, but still counts as covered.
+    let both: Vec<String> = vec!["src/a.ts".into(), "src/a.test.ts".into()];
+    let targets = resolve_test_targets(&both);
+    assert_eq!(targets.js_tests, vec!["src/a.test.ts"]);
+    assert!(!targets
+        .js_sibling_candidates()
+        .iter()
+        .any(|c| c.as_str() == "src/a.test.ts"));
+    assert!(targets.js_sources[0]
+        .candidates
+        .iter()
+        .any(|c| c == "src/a.test.ts"));
+
+    // Snapshot updates require the test file that owns the snapshot.
+    let snap = resolve_test_targets(&["src/__snapshots__/a.spec.ts.snap".to_owned()]);
+    assert!(!snap.is_full_suite());
+    assert_eq!(snap.js_sources[0].candidates, vec!["src/a.spec.ts"]);
+}
+
+#[test]
+fn test_targets_fall_back_to_full_suite_for_shared_config() {
+    use airgap::tools::pr::resolve_test_targets;
+
+    for trigger in [
+        "package.json",
+        "packages/core/package.json",
+        "pnpm-lock.yaml",
+        "yarn.lock",
+        "Cargo.lock",
+        "Cargo.toml",
+        "tsconfig.json",
+        "tsconfig.build.json",
+        ".github/workflows/ci.yml",
+        "vitest.config.ts",
+        "jest.config.js",
+        "pyproject.toml",
+        "requirements-dev.txt",
+        "tests/conftest.py",
+        "tests/helpers/server.ts",
+        "test/_setup.js",
+        "tests/fixtures/data.json",
+        "tests/common/mod.rs",
+        // Files no sibling-pairing rule covers are treated as untested source.
+        "source/types.d.ts",
+        "pkg/__init__.py",
+        "src/App.vue",
+        "src/styles.css",
+        "source/locales/en.json",
+        "scripts/release.sh",
+    ] {
+        let files = vec!["source/cli-args.spec.ts".to_owned(), trigger.to_owned()];
+        let targets = resolve_test_targets(&files);
+        assert!(
+            targets.is_full_suite(),
+            "{trigger} should force the full suite"
+        );
+        assert!(targets.js_tests.is_empty() && targets.js_sources.is_empty());
+        assert!(targets.full_suite_reason.unwrap().contains(trigger));
+    }
+
+    let many: Vec<String> = (0..21).map(|i| format!("src/t{i}.test.ts")).collect();
+    assert!(resolve_test_targets(&many).is_full_suite());
+    let many_sources: Vec<String> = (0..21).map(|i| format!("src/m{i}.ts")).collect();
+    assert!(resolve_test_targets(&many_sources).is_full_suite());
+
+    // Docs-only PRs have no targets; the sandbox script then runs the full suite.
+    let docs = resolve_test_targets(&["README.md".to_owned(), "docs/guide.md".to_owned()]);
+    assert!(!docs.is_full_suite());
+    assert!(docs.js_tests.is_empty() && docs.js_sources.is_empty());
+    let script = pr_script_for(&["README.md"]);
+    assert!(!script.contains("RUNNER="));
+    assert!(!script.contains("cargo test \"$@\""));
+    assert!(!script.contains("pytest -- \"$@\""));
+    assert!(script.contains("exec \"$PM\" run \"$TEST_SCRIPT\""));
+    assert!(script.contains("exec cargo test\n"));
+    assert!(script.contains("exec pytest\n"));
+
+    let script = pr_script_for(&["source/a.spec.ts", "pnpm-lock.yaml"]);
+    assert!(script.contains("AIRGAP_INFO: running full test suite: pnpm-lock.yaml"));
+    assert!(!script.contains("'source/a.spec.ts'"));
+    assert!(!script.contains("RUNNER="));
+}
+
+#[test]
+fn unpaired_sources_force_full_suite_in_sandbox() {
+    let script = pr_script_for(&["source/models/models-dev-client.ts", "source/other.spec.ts"]);
+    // The source is covered only if at least one sibling exists; otherwise every targeted block is skipped.
+    assert!(script.contains(
+        "if [ ! -f 'source/models/models-dev-client.spec.ts' ] && [ ! -f 'source/models/models-dev-client.spec.tsx' ] && [ ! -f 'source/models/models-dev-client.test.ts' ] && [ ! -f 'source/models/models-dev-client.test.tsx' ]; then echo 'AIRGAP_INFO: running full test suite: no sibling test found for source/models/models-dev-client.ts' >&2; TARGET_FULL=1; fi"
+    ));
+    let check = script.find("TARGET_FULL=0").unwrap();
+    let gate = script.find("if [ \"$TARGET_FULL\" = 0 ]; then").unwrap();
+    let branch = check
+        + script[check..]
+            .find("if [ -f package.json ]; then")
+            .unwrap();
+    assert!(branch < gate);
+    assert!(gate < script.find("RUNNER=").unwrap());
+}
+
+#[test]
+fn rust_source_changes_run_full_cargo_test() {
+    use airgap::tools::pr::resolve_test_targets;
+
+    for source in [
+        "src/lib.rs",
+        "src/tools/pr.rs",
+        "crates/core/src/lib.rs",
+        "examples/demo.rs",
+    ] {
+        let targets =
+            resolve_test_targets(&["tests/test_scanner.rs".to_owned(), source.to_owned()]);
+        assert!(targets.rust_sources_changed, "{source}");
+        assert!(targets.cargo_integration_tests.is_empty(), "{source}");
+        let script = pr_script_for(&["tests/test_scanner.rs", source]);
+        assert!(!script.contains("--test 'test_scanner'"), "{source}");
+        assert!(!script.contains("exec cargo test \"$@\""), "{source}");
+        assert!(script.contains("exec cargo test\n"));
+    }
+
+    let only_tests = resolve_test_targets(&["tests/test_scanner.rs".to_owned()]);
+    assert!(!only_tests.rust_sources_changed);
+    assert_eq!(only_tests.cargo_integration_tests, vec!["test_scanner"]);
+}
+
+#[test]
+fn targeted_test_commands_are_runner_specific_and_quoted() {
+    let script = pr_script_for(&[
+        "source/models/models-dev-client.ts",
+        "source/it's here.test.ts",
+        "--reporter=evil.test.js",
+        "-rf.spec.ts",
+        "../escape.test.ts",
+        "pkg/test_mod.py",
+        "tests/cli.rs",
+    ]);
+
+    // Sibling candidates are existence-checked inside the sandbox before they are run.
+    assert!(script.contains(
+        "if [ -f 'source/models/models-dev-client.spec.ts' ]; then set -- \"$@\" 'source/models/models-dev-client.spec.ts'; fi"
+    ));
+    assert!(script.contains("'source/it'\"'\"'s here.test.ts'"));
+    assert!(!script.contains("--reporter=evil"));
+    assert!(!script.contains("-rf.spec.ts"));
+    assert!(!script.contains("escape.test.ts"));
+
+    assert!(script.contains("exec \"$PM\" exec ava -- \"$@\""));
+    assert!(script.contains("exec \"$PM\" exec vitest run -- \"$@\""));
+    assert!(script.contains("exec \"$PM\" exec jest --runTestsByPath \"$@\""));
+    assert!(script.contains("exec node --test \"$@\""));
+    assert!(script.contains("set -- \"$@\" \"./$f\""));
+    assert!(
+        script.contains("if [ -f 'pkg/test_mod.py' ]; then set -- \"$@\" 'pkg/test_mod.py'; fi")
+    );
+    assert!(script.contains("exec pytest -- \"$@\""));
+    assert!(script.contains("if [ -f 'tests/cli.rs' ]; then set -- \"$@\" --test 'cli'; fi"));
+    assert!(script.contains("exec cargo test \"$@\""));
+
+    // Targeted runs come before the full-suite fallback in each branch.
+    let targeted = script.find("exec \"$PM\" exec ava").unwrap();
+    let full = script.find("exec \"$PM\" run \"$TEST_SCRIPT\"").unwrap();
+    assert!(targeted < full);
+    let cargo_targeted = script.find("exec cargo test \"$@\"").unwrap();
+    let cargo_full = script.find("exec cargo test\n").unwrap();
+    assert!(cargo_targeted < cargo_full);
+}
 #[test]
 fn config_updates_are_atomic_and_validate_timeouts() {
     let mut state = RuntimeConfig {

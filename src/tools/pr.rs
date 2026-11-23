@@ -722,12 +722,6 @@ pub fn build_pr_script(
         "export YARN_ENABLE_SCRIPTS=false\n    "
     };
 
-    let changed_js_tests: Vec<String> = changed_files
-        .iter()
-        .filter(|p| is_js_test_file(p))
-        .take(20)
-        .map(|p| shell_quote(p))
-        .collect();
     let needs_build_for_tests = changed_files
         .iter()
         .any(|p| is_js_test_file(p) && (p.contains("integration") || p.contains("cli")));
@@ -787,41 +781,36 @@ fi"#
     let run_step = if let Some(cmd) = test_command {
         format!("exec sh -c {}", shell_quote(cmd))
     } else {
-        let targeted_block = if changed_js_tests.is_empty() {
-            String::new()
-        } else {
-            let quoted_tests = changed_js_tests.join(" ");
-            format!(
-                r#"  RUNNER="$(node -e 'const p=require("./package.json"); const s=p.scripts||{{}}; const d=Object.assign({{}},p.devDependencies||{{}},p.dependencies||{{}}); const vals=Object.values(s).join(" "); if(d.ava||/\bava\b/.test(vals)) console.log("ava"); else if(d.vitest||/\bvitest\b/.test(vals)) console.log("vitest"); else if(d.jest||/\bjest\b/.test(vals)) console.log("jest");')"
-  if [ "$RUNNER" = "ava" ]; then
-    exec "$PM" exec ava -- {quoted_tests}
-  elif [ "$RUNNER" = "vitest" ]; then
-    exec "$PM" exec vitest run -- {quoted_tests}
-  elif [ "$RUNNER" = "jest" ]; then
-    exec "$PM" exec jest -- {quoted_tests}
-  fi"#
-            )
+        let targets = resolve_test_targets(changed_files);
+        let full_suite_note = match targets.full_suite_reason.as_deref() {
+            Some(reason) => format!(
+                "echo {} >&2\n",
+                shell_quote(&format!("AIRGAP_INFO: running full test suite: {reason}"))
+            ),
+            None => String::new(),
         };
+        let coverage_check = sibling_coverage_check(&targets);
+        let js_block = js_targeted_block(&targets);
+        let py_block = py_targeted_block(&targets);
+        let cargo_block = cargo_targeted_block(&targets);
         format!(
-            r#"if [ -f package.json ]; then
-{targeted_block}
-  TEST_SCRIPT="$(node -e 'const p=require("./package.json"); const s=p.scripts||{{}}; for (const k of ["test","test:unit","test:vitest","test:jest","test:ava","test:ci","test:all"]) {{ if (s[k]) {{ console.log(k); process.exit(0); }} }}')"
+            r#"{full_suite_note}{coverage_check}if [ -f package.json ]; then
+{js_block}  TEST_SCRIPT="$(node -e 'const p=require("./package.json"); const s=p.scripts||{{}}; for (const k of ["test","test:unit","test:vitest","test:jest","test:ava","test:ci","test:all"]) {{ if (s[k]) {{ console.log(k); process.exit(0); }} }}')"
   if [ -n "$TEST_SCRIPT" ]; then
     exec "$PM" run "$TEST_SCRIPT"
   fi
   echo "AIRGAP_ERROR: package.json has no recognized test script; pass test_command explicitly" >&2
   exit 2
 elif [ -f Cargo.toml ]; then
-  exec cargo test
+{cargo_block}  exec cargo test
 elif [ -f pyproject.toml ] || [ -f pytest.ini ] || [ -d tests ]; then
-  exec pytest
+{py_block}  exec pytest
 else
   echo "AIRGAP_ERROR: no recognized test suite; pass test_command explicitly" >&2
   exit 2
 fi"#
         )
     };
-
     format!(
         r#"#!/bin/sh
 set -eu
@@ -901,12 +890,474 @@ fi
     )
 }
 
-fn is_js_test_file(path: &str) -> bool {
-    if path.is_empty()
-        || path.starts_with('-')
-        || path.contains("..")
-        || path.contains(['\\', ':', '\n', '\r', '\0'])
+const MAX_TARGETED_TESTS: usize = 20;
+const MAX_PAIRED_SOURCES: usize = 20;
+const JS_TS_EXTS: [&str; 2] = ["ts", "tsx"];
+const JS_EXTS: [&str; 4] = ["js", "jsx", "mjs", "cjs"];
+
+/// A changed source file and the sibling test paths that would cover it.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct SourcePairing {
+    pub source: String,
+    pub candidates: Vec<String>,
+}
+
+/// Tests selected from a PR's changed files. When `full_suite_reason` is set, every list is empty
+/// and the repository's full test script runs instead.
+#[derive(Debug, Default, Clone, PartialEq, Eq)]
+pub struct TestTargets {
+    pub full_suite_reason: Option<String>,
+    /// Changed JS/TS test files.
+    pub js_tests: Vec<String>,
+    /// Changed JS/TS sources (and snapshot files) with their sibling `*.spec.*` / `*.test.*` paths.
+    pub js_sources: Vec<SourcePairing>,
+    /// Changed pytest files.
+    pub py_tests: Vec<String>,
+    /// Changed Python sources with their `test_<name>.py` / `<name>_test.py` paths.
+    pub py_sources: Vec<SourcePairing>,
+    /// Integration test target names from changed root `tests/<name>.rs` files.
+    pub cargo_integration_tests: Vec<String>,
+    /// A Rust file outside root `tests/` changed, so `cargo test` must run in full.
+    pub rust_sources_changed: bool,
+}
+
+impl TestTargets {
+    pub fn is_full_suite(&self) -> bool {
+        self.full_suite_reason.is_some()
+    }
+
+    /// Sibling paths to run if they exist, excluding tests the PR already changed.
+    pub fn js_sibling_candidates(&self) -> Vec<&String> {
+        sibling_candidates(&self.js_sources, &self.js_tests)
+    }
+
+    pub fn py_sibling_candidates(&self) -> Vec<&String> {
+        sibling_candidates(&self.py_sources, &self.py_tests)
+    }
+
+    fn full_suite(reason: String) -> Self {
+        Self {
+            full_suite_reason: Some(reason),
+            ..Self::default()
+        }
+    }
+}
+
+fn sibling_candidates<'a>(sources: &'a [SourcePairing], direct: &[String]) -> Vec<&'a String> {
+    let mut out: Vec<&String> = Vec::new();
+    for candidate in sources.iter().flat_map(|s| s.candidates.iter()) {
+        if !direct.contains(candidate) && !out.contains(&candidate) {
+            out.push(candidate);
+        }
+    }
+    out
+}
+
+/// Maps changed files to targeted tests. Changed test files run directly and every changed source
+/// must have a sibling test; the sandbox script runs the full suite if any source's siblings are
+/// missing. Shared config, lockfile, test-support, or unrecognized file changes force the full suite
+/// up front, and any Rust change outside root `tests/` forces a full `cargo test`.
+pub fn resolve_test_targets(changed_files: &[String]) -> TestTargets {
+    if changed_files.len() >= MAX_PR_FILES {
+        return TestTargets::full_suite(format!(
+            "PR touches {MAX_PR_FILES}+ files; changed file list may be incomplete"
+        ));
+    }
+
+    let mut targets = TestTargets::default();
+    for path in changed_files {
+        if !is_safe_target_path(path) {
+            continue;
+        }
+        if is_suite_config_file(path) {
+            return TestTargets::full_suite(format!(
+                "{path} changes shared build/test configuration"
+            ));
+        }
+        let (dir, file_name) = match path.rsplit_once('/') {
+            Some((dir, name)) => (Some(dir), name),
+            None => (None, path.as_str()),
+        };
+
+        if let Some(test_file) = snapshot_owner(dir, file_name) {
+            targets.js_sources.push(SourcePairing {
+                source: path.clone(),
+                candidates: vec![test_file],
+            });
+        } else if is_js_test_file(path) {
+            push_unique(&mut targets.js_tests, path);
+        } else if is_py_test_file(file_name) {
+            push_unique(&mut targets.py_tests, path);
+        } else if let Some(name) = cargo_integration_test_name(path) {
+            push_unique(&mut targets.cargo_integration_tests, &name);
+        } else if in_test_directory(path) {
+            if js_ext(file_name).is_some() && !is_test_support_path(path) {
+                push_unique(&mut targets.js_tests, path);
+            } else {
+                // Helpers, fixtures, snapshots, conftest-style modules, or nested Rust test modules
+                // can affect any test, so targeting would under-test.
+                return TestTargets::full_suite(format!("{path} is shared test support code"));
+            }
+        } else if let Some((stem, ext)) = js_source_stem(file_name) {
+            let family: &[&str] = if JS_TS_EXTS.contains(&ext) {
+                &JS_TS_EXTS
+            } else {
+                &JS_EXTS
+            };
+            let mut candidates = Vec::new();
+            for kind in ["spec", "test"] {
+                for candidate_ext in family {
+                    candidates.push(join_path(dir, &format!("{stem}.{kind}.{candidate_ext}")));
+                }
+            }
+            targets.js_sources.push(SourcePairing {
+                source: path.clone(),
+                candidates,
+            });
+        } else if let Some(stem) = file_name
+            .strip_suffix(".py")
+            .filter(|s| !s.is_empty() && *s != "__init__")
+        {
+            let mut candidates = vec![
+                join_path(dir, &format!("test_{stem}.py")),
+                join_path(dir, &format!("{stem}_test.py")),
+            ];
+            push_unique(&mut candidates, &format!("tests/test_{stem}.py"));
+            targets.py_sources.push(SourcePairing {
+                source: path.clone(),
+                candidates,
+            });
+        } else if file_name.ends_with(".rs") {
+            targets.rust_sources_changed = true;
+        } else if !is_non_code_file(path) {
+            return TestTargets::full_suite(format!("{path} has no sibling test pairing rule"));
+        }
+    }
+
+    let direct =
+        targets.js_tests.len() + targets.py_tests.len() + targets.cargo_integration_tests.len();
+    if direct > MAX_TARGETED_TESTS {
+        return TestTargets::full_suite(format!(
+            "PR changes {direct} test files (targeting limit {MAX_TARGETED_TESTS})"
+        ));
+    }
+    let paired_sources = targets.js_sources.len() + targets.py_sources.len();
+    if paired_sources > MAX_PAIRED_SOURCES {
+        return TestTargets::full_suite(format!(
+            "PR changes {paired_sources} source files (pairing limit {MAX_PAIRED_SOURCES})"
+        ));
+    }
+    if targets.rust_sources_changed {
+        targets.cargo_integration_tests.clear();
+    }
+    targets
+}
+
+/// Docs and static assets that no test suite executes.
+fn is_non_code_file(path: &str) -> bool {
+    if path.starts_with("docs/")
+        || (path.starts_with(".github/") && !path.ends_with(".yml") && !path.ends_with(".yaml"))
     {
+        return true;
+    }
+    let file_name = path.rsplit('/').next().unwrap_or(path);
+    if matches!(
+        file_name,
+        "LICENSE"
+            | "LICENCE"
+            | "NOTICE"
+            | "AUTHORS"
+            | "CODEOWNERS"
+            | ".gitignore"
+            | ".gitattributes"
+            | ".editorconfig"
+    ) || file_name.starts_with("LICENSE.")
+    {
+        return true;
+    }
+    let ext = file_name
+        .rsplit_once('.')
+        .map(|(_, e)| e.to_ascii_lowercase());
+    matches!(
+        ext.as_deref(),
+        Some(
+            "md" | "mdx"
+                | "markdown"
+                | "rst"
+                | "adoc"
+                | "txt"
+                | "png"
+                | "jpg"
+                | "jpeg"
+                | "gif"
+                | "svg"
+                | "webp"
+                | "ico"
+        )
+    )
+}
+fn push_unique(list: &mut Vec<String>, value: &str) {
+    if !list.iter().any(|v| v == value) {
+        list.push(value.to_owned());
+    }
+}
+
+fn join_path(dir: Option<&str>, name: &str) -> String {
+    match dir {
+        Some(dir) => format!("{dir}/{name}"),
+        None => name.to_owned(),
+    }
+}
+
+/// Maps `dir/__snapshots__/a.spec.ts.snap` to the test that owns it, `dir/a.spec.ts`.
+fn snapshot_owner(dir: Option<&str>, file_name: &str) -> Option<String> {
+    let test_name = file_name.strip_suffix(".snap")?;
+    let parent = match dir? {
+        "__snapshots__" => None,
+        d => Some(d.strip_suffix("/__snapshots__")?),
+    };
+    let owner = join_path(parent, test_name);
+    is_js_test_file(&owner).then_some(owner)
+}
+
+fn is_safe_target_path(path: &str) -> bool {
+    !path.is_empty()
+        && !path.starts_with('-')
+        && !path.starts_with('/')
+        && !path.contains("..")
+        && !path.contains(['\\', ':', '\n', '\r', '\0'])
+}
+
+fn is_suite_config_file(path: &str) -> bool {
+    if path.starts_with(".github/workflows/") || path.starts_with(".github/actions/") {
+        return true;
+    }
+    if path == ".cargo/config.toml"
+        || path == ".cargo/config"
+        || path.ends_with("/.cargo/config.toml")
+        || path.ends_with("/.cargo/config")
+    {
+        return true;
+    }
+    let file_name = path.rsplit('/').next().unwrap_or(path);
+    matches!(
+        file_name,
+        "package.json"
+            | "package-lock.json"
+            | "npm-shrinkwrap.json"
+            | "pnpm-lock.yaml"
+            | "pnpm-workspace.yaml"
+            | "yarn.lock"
+            | "bun.lockb"
+            | "bun.lock"
+            | ".nvmrc"
+            | ".node-version"
+            | ".babelrc"
+            | ".swcrc"
+            | "jsconfig.json"
+            | "Cargo.toml"
+            | "Cargo.lock"
+            | "build.rs"
+            | "rust-toolchain"
+            | "rust-toolchain.toml"
+            | "pyproject.toml"
+            | "setup.py"
+            | "setup.cfg"
+            | "tox.ini"
+            | "pytest.ini"
+            | "conftest.py"
+    ) || (file_name.starts_with("tsconfig") && file_name.ends_with(".json"))
+        || (file_name.starts_with("requirements") && file_name.ends_with(".txt"))
+        || [
+            "vitest.config.",
+            "vitest.workspace.",
+            "vitest.setup.",
+            "jest.config.",
+            "jest.setup.",
+            "ava.config.",
+            "babel.config.",
+        ]
+        .iter()
+        .any(|prefix| file_name.starts_with(prefix))
+}
+
+fn js_ext(file_name: &str) -> Option<&'static str> {
+    let (_, ext) = file_name.rsplit_once('.')?;
+    JS_TS_EXTS
+        .iter()
+        .chain(JS_EXTS.iter())
+        .copied()
+        .find(|e| *e == ext)
+}
+
+fn js_source_stem(file_name: &str) -> Option<(&str, &'static str)> {
+    // Declaration files have no sibling tests; leaving them unpaired forces the full suite.
+    if file_name.contains(".d.") {
+        return None;
+    }
+    let ext = js_ext(file_name)?;
+    let stem = &file_name[..file_name.len() - ext.len() - 1];
+    (!stem.is_empty()).then_some((stem, ext))
+}
+
+fn is_py_test_file(file_name: &str) -> bool {
+    file_name.ends_with(".py")
+        && ((file_name.starts_with("test_") && file_name.len() > "test_.py".len())
+            || (file_name.ends_with("_test.py") && file_name.len() > "_test.py".len()))
+}
+
+fn cargo_integration_test_name(path: &str) -> Option<String> {
+    let name = path.strip_prefix("tests/")?.strip_suffix(".rs")?;
+    (!name.is_empty()
+        && !name.starts_with('-')
+        && name
+            .bytes()
+            .all(|b| b.is_ascii_alphanumeric() || matches!(b, b'_' | b'-')))
+    .then(|| name.to_owned())
+}
+
+fn in_test_directory(path: &str) -> bool {
+    let mut segments: Vec<&str> = path.split('/').collect();
+    segments.pop();
+    segments
+        .iter()
+        .any(|s| matches!(*s, "tests" | "test" | "__tests__"))
+}
+
+fn is_test_support_path(path: &str) -> bool {
+    let file_name = path.rsplit('/').next().unwrap_or(path);
+    file_name.starts_with('_')
+        || path.split('/').any(|s| {
+            matches!(
+                s,
+                "helpers"
+                    | "helper"
+                    | "fixtures"
+                    | "__fixtures__"
+                    | "__mocks__"
+                    | "__snapshots__"
+                    | "support"
+                    | "utils"
+                    | "setup"
+            )
+        })
+}
+
+/// Emits `set -- ...` lines that collect paths that exist in the checkout into `"$@"`.
+fn positional_file_list(paths: &[&String], indent: &str) -> String {
+    let mut out = format!("{indent}set --\n");
+    for path in paths {
+        let q = shell_quote(path);
+        out.push_str(&format!(
+            "{indent}if [ -f {q} ]; then set -- \"$@\" {q}; fi\n"
+        ));
+    }
+    out
+}
+
+/// Sets `TARGET_FULL=1` when any changed source has none of its sibling tests in the checkout,
+/// so untested source changes never pass on a targeted run.
+fn sibling_coverage_check(targets: &TestTargets) -> String {
+    let mut out = String::from("TARGET_FULL=0\n");
+    for pairing in targets.js_sources.iter().chain(targets.py_sources.iter()) {
+        let missing = pairing
+            .candidates
+            .iter()
+            .map(|c| format!("[ ! -f {} ]", shell_quote(c)))
+            .collect::<Vec<_>>()
+            .join(" && ");
+        let note = shell_quote(&format!(
+            "AIRGAP_INFO: running full test suite: no sibling test found for {}",
+            pairing.source
+        ));
+        out.push_str(&format!(
+            "if {missing}; then echo {note} >&2; TARGET_FULL=1; fi\n"
+        ));
+    }
+    out
+}
+
+fn js_targeted_block(targets: &TestTargets) -> String {
+    let paths: Vec<&String> = targets
+        .js_tests
+        .iter()
+        .chain(targets.js_sibling_candidates())
+        .collect();
+    if paths.is_empty() {
+        return String::new();
+    }
+    let list = positional_file_list(&paths, "    ");
+    // Jest and `node --test` take no `--` separator, so paths get a `./` prefix to keep them from
+    // ever being parsed as flags.
+    format!(
+        r#"  if [ "$TARGET_FULL" = 0 ]; then
+{list}    if [ "$#" -gt 0 ]; then
+      RUNNER="$(node -e 'const p=require("./package.json"); const s=p.scripts||{{}}; const d=Object.assign({{}},p.devDependencies||{{}},p.dependencies||{{}}); const vals=Object.values(s).join(" "); if(d.ava||/\bava\b/.test(vals)) console.log("ava"); else if(d.vitest||/\bvitest\b/.test(vals)) console.log("vitest"); else if(d.jest||/\bjest\b/.test(vals)) console.log("jest"); else if(/\bnode\s+--test\b/.test(vals)) console.log("node");')"
+      case "$RUNNER" in
+        ava|vitest|jest|node) echo "AIRGAP_INFO: targeted $RUNNER run over $# file(s)" >&2 ;;
+      esac
+      if [ "$RUNNER" = "ava" ]; then
+        exec "$PM" exec ava -- "$@"
+      elif [ "$RUNNER" = "vitest" ]; then
+        exec "$PM" exec vitest run -- "$@"
+      elif [ "$RUNNER" = "jest" ]; then
+        for f in "$@"; do shift; set -- "$@" "./$f"; done
+        exec "$PM" exec jest --runTestsByPath "$@"
+      elif [ "$RUNNER" = "node" ]; then
+        for f in "$@"; do shift; set -- "$@" "./$f"; done
+        exec node --test "$@"
+      fi
+    fi
+  fi
+"#
+    )
+}
+
+fn py_targeted_block(targets: &TestTargets) -> String {
+    let paths: Vec<&String> = targets
+        .py_tests
+        .iter()
+        .chain(targets.py_sibling_candidates())
+        .collect();
+    if paths.is_empty() {
+        return String::new();
+    }
+    let list = positional_file_list(&paths, "    ");
+    format!(
+        r#"  if [ "$TARGET_FULL" = 0 ]; then
+{list}    if [ "$#" -gt 0 ]; then
+      echo "AIRGAP_INFO: targeted pytest run over $# file(s)" >&2
+      exec pytest -- "$@"
+    fi
+  fi
+"#
+    )
+}
+
+fn cargo_targeted_block(targets: &TestTargets) -> String {
+    if targets.cargo_integration_tests.is_empty() {
+        return String::new();
+    }
+    let mut out = String::from("  if [ \"$TARGET_FULL\" = 0 ]; then\n    set --\n");
+    for name in &targets.cargo_integration_tests {
+        out.push_str(&format!(
+            "    if [ -f {file} ]; then set -- \"$@\" --test {name}; fi\n",
+            file = shell_quote(&format!("tests/{name}.rs")),
+            name = shell_quote(name)
+        ));
+    }
+    out.push_str(
+        r#"    if [ "$#" -gt 0 ]; then
+      echo "AIRGAP_INFO: targeted cargo integration test run" >&2
+      exec cargo test "$@"
+    fi
+  fi
+"#,
+    );
+    out
+}
+fn is_js_test_file(path: &str) -> bool {
+    if !is_safe_target_path(path) {
         return false;
     }
     [

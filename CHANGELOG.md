@@ -2,6 +2,12 @@
 
 Changes are recorded here before each release.
 
+## [Unreleased]
+
+### Added
+
+- `airgap_verify_pr` surgical test targeting: when no `test_command` is given, changed test files (`*.spec.*`, `*.test.*`, `tests/**`, `test_*.py`, root `tests/<name>.rs`) run directly and changed sources pull in sibling `*.spec.*` / `*.test.*` / `test_*.py` files that exist in the checkout. Runs use `ava --`, `vitest run --`, `jest --runTestsByPath ./…`, `node --test ./…`, `pytest --`, or `cargo test --test <name>`. The selector is conservative: any changed JS/TS/Python source without an existing sibling test, any file without a pairing rule (other than docs and images), lockfile, manifest, tsconfig, test-runner config, CI workflow, or shared test-helper changes, more than 20 targets, or zero resolved targets fall back to the full test script. Any Rust change outside root `tests/` runs a full `cargo test`.
+
 ## [0.2.0] - 2026-11-22
 
 ### Added
