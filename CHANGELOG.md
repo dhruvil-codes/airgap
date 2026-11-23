@@ -7,6 +7,7 @@ Changes are recorded here before each release.
 ### Added
 
 - `airgap_verify_pr` surgical test targeting: when no `test_command` is given, changed test files (`*.spec.*`, `*.test.*`, `tests/**`, `test_*.py`, root `tests/<name>.rs`) run directly and changed sources pull in sibling `*.spec.*` / `*.test.*` / `test_*.py` files that exist in the checkout. Runs use `ava --`, `vitest run --`, `jest --runTestsByPath ./…`, `node --test ./…`, `pytest --`, or `cargo test --test <name>`. The selector is conservative: any changed JS/TS/Python source without an existing sibling test, any file without a pairing rule (other than docs and images), lockfile, manifest, tsconfig, test-runner config, CI workflow, or shared test-helper changes, more than 20 targets, or zero resolved targets fall back to the full test script. Any Rust change outside root `tests/` runs a full `cargo test`.
+- `airgap_verify_pr` package cache hydration: sandbox scripts prefer pre-warmed template stores (`/opt/airgap/cache/pnpm` as `PNPM_STORE_DIR`, `/opt/airgap/cache/cargo` as `CARGO_HOME`) when present and writable. With `AIRGAP_CACHE_URL` set, the pnpm store is hydrated from `pnpm-<sha256(pnpm-lock.yaml)>.tar.zst` after a validated hash, a 4 GiB size cap, and a `zstd -t` integrity test. Store integrity verification is forced on, and if an install from a cached store fails, it is retried once on a clean store with the same `--ignore-scripts --ignore-pnpmfile` hardening.
 
 ## [0.2.0] - 2026-11-22
 

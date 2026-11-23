@@ -9,7 +9,10 @@ use serde_json::Value;
 
 use crate::{
     gmi::{
-        agentbox::{shell_quote, AgentBox, ExecutionResult},
+        agentbox::{
+            package_store_setup, pnpm_cache_hydration, shell_quote, AgentBox, ExecutionResult,
+            CLEAN_PNPM_STORE,
+        },
         maas::Maas,
         response_json,
     },
@@ -743,20 +746,9 @@ pub fn build_pr_script(
         },
     };
 
-    let cache_hydrate = match cache_base_url {
-        Some(base) => format!(
-            r#"if [ -f pnpm-lock.yaml ] && command -v curl >/dev/null 2>&1 && command -v zstd >/dev/null 2>&1; then
-  LOCK_HASH="$(sha256sum pnpm-lock.yaml | awk '{{print $1}}')"
-  if [ -n "$LOCK_HASH" ] && curl -fsSL --max-time 20 {base_q}"/pnpm-${{LOCK_HASH}}.tar.zst" -o /root/tmp/pnpm-cache.tar.zst 2>/dev/null; then
-    mkdir -p "$PNPM_STORE_DIR"
-    tar --zstd --no-same-owner -xf /root/tmp/pnpm-cache.tar.zst -C "$PNPM_STORE_DIR" 2>/dev/null || true
-    rm -f /root/tmp/pnpm-cache.tar.zst
-  fi
-fi"#,
-            base_q = shell_quote(base)
-        ),
-        None => String::new(),
-    };
+    let store_setup = package_store_setup();
+    let cache_hydrate = pnpm_cache_hydration(cache_base_url);
+    let clean_store = CLEAN_PNPM_STORE;
 
     let build_step = if let Some(cmd) = build_command {
         format!(
@@ -823,11 +815,7 @@ export PNPM_HOME=/root/.local/share/pnpm
 export PATH="$PNPM_HOME:$PATH"
 export NODE_OPTIONS="${{NODE_OPTIONS:---max-old-space-size=3072}}"
 
-if [ -d /opt/airgap/pnpm-store ]; then
-  export PNPM_STORE_DIR=/opt/airgap/pnpm-store
-else
-  export PNPM_STORE_DIR=/root/.local/share/pnpm/store
-fi
+{store_setup}
 
 mkdir -p /workspace /root/tmp
 cd /workspace
@@ -858,8 +846,18 @@ if [ -f package.json ]; then
       corepack enable >/dev/null 2>&1 || true
     fi
     if ! pnpm install --frozen-lockfile --prefer-offline{pnpm_hardening_flags} --store-dir "$PNPM_STORE_DIR" --child-concurrency=4 >/root/tmp/airgap-install.log 2>&1; then
-      tail -n 60 /root/tmp/airgap-install.log >&2
-      exit 1
+      if [ "$AIRGAP_PNPM_CACHED" = 1 ]; then
+        echo "AIRGAP_INFO: install from cached pnpm store failed; retrying with a clean store" >&2
+        rm -rf node_modules
+        export PNPM_STORE_DIR={clean_store}
+        if ! pnpm install --frozen-lockfile --prefer-offline{pnpm_hardening_flags} --store-dir "$PNPM_STORE_DIR" --child-concurrency=4 >/root/tmp/airgap-install.log 2>&1; then
+          tail -n 60 /root/tmp/airgap-install.log >&2
+          exit 1
+        fi
+      else
+        tail -n 60 /root/tmp/airgap-install.log >&2
+        exit 1
+      fi
     fi
   elif [ -f yarn.lock ]; then
     PM="yarn"

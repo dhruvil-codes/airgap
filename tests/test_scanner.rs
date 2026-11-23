@@ -554,6 +554,86 @@ fn targeted_test_commands_are_runner_specific_and_quoted() {
     assert!(cargo_targeted < cargo_full);
 }
 #[test]
+fn pr_script_prefers_prewarmed_stores_and_hydrates_by_lockfile_hash() {
+    use airgap::gmi::agentbox::{
+        CLEAN_PNPM_STORE, LOCAL_PNPM_STORE, PREWARMED_CARGO_HOME, PREWARMED_PNPM_STORE,
+    };
+    use airgap::tools::pr::{build_pr_script, PrTarget};
+
+    let target = PrTarget {
+        owner: "o".into(),
+        repo: "r".into(),
+        number: 7,
+    };
+    let sha = "0123456789abcdef0123456789abcdef01234567";
+    let script = build_pr_script(
+        &target,
+        sha,
+        &["source/a.spec.ts".to_owned()],
+        None,
+        None,
+        None,
+        false,
+        Some("https://cache.example.com"),
+    );
+
+    // Pre-warmed stores are used only when present and writable, with a local store fallback.
+    assert_eq!(PREWARMED_PNPM_STORE, "/opt/airgap/cache/pnpm");
+    assert_eq!(PREWARMED_CARGO_HOME, "/opt/airgap/cache/cargo");
+    assert!(script.contains(
+        "if [ -d /opt/airgap/cache/pnpm ] && [ -w /opt/airgap/cache/pnpm ]; then\n  export PNPM_STORE_DIR=/opt/airgap/cache/pnpm"
+    ));
+    assert!(script.contains(&format!("export PNPM_STORE_DIR={LOCAL_PNPM_STORE}")));
+    assert!(script.contains(
+        "if [ -d /opt/airgap/cache/cargo ] && [ -w /opt/airgap/cache/cargo ]; then\n  export CARGO_HOME=/opt/airgap/cache/cargo"
+    ));
+    assert!(script.contains("export npm_config_verify_store_integrity=true"));
+
+    // Hydration is keyed on a validated SHA-256 of the lockfile and tests the archive before unpacking.
+    let store_pos = script.find("AIRGAP_PNPM_CACHED=0").unwrap();
+    let checkout_pos = script.find("git checkout -q --detach").unwrap();
+    let hash_pos = script.find("sha256sum pnpm-lock.yaml").unwrap();
+    let install_pos = script.find("pnpm install").unwrap();
+    assert!(store_pos < checkout_pos && checkout_pos < hash_pos && hash_pos < install_pos);
+    assert!(script.contains("*[!0-9a-f]*) LOCK_HASH=\"\" ;;"));
+    assert!(script.contains("[ \"${#LOCK_HASH}\" -eq 64 ]"));
+    assert!(script.contains("'https://cache.example.com'\"/pnpm-${LOCK_HASH}.tar.zst\""));
+    assert!(script.contains("--max-filesize 4294967296"));
+    let test_pos = script.find("zstd -tq -T0 \"$CACHE_ARCHIVE\"").unwrap();
+    let extract_pos = script
+        .find("zstd -dcq -T0 \"$CACHE_ARCHIVE\" | tar --no-same-owner --no-same-permissions -xf - -C \"$PNPM_STORE_DIR\"")
+        .unwrap();
+    assert!(test_pos < extract_pos);
+
+    // Both install attempts are hardened, and the retry runs only when a cached store was used.
+    let hardened = "pnpm install --frozen-lockfile --prefer-offline --ignore-scripts --ignore-pnpmfile --store-dir \"$PNPM_STORE_DIR\" --child-concurrency=4";
+    assert_eq!(script.matches(hardened).count(), 2);
+    let retry_gate = script
+        .find("if [ \"$AIRGAP_PNPM_CACHED\" = 1 ]; then")
+        .unwrap();
+    let clean = script
+        .find(&format!("export PNPM_STORE_DIR={CLEAN_PNPM_STORE}"))
+        .unwrap();
+    assert!(install_pos < retry_gate && retry_gate < clean);
+    assert!(script[retry_gate..clean].contains("rm -rf node_modules"));
+
+    // Without a cache URL there is no network hydration, but pre-warmed stores and the retry remain.
+    let offline = build_pr_script(&target, sha, &[], None, None, None, false, None);
+    assert!(!offline.contains("sha256sum pnpm-lock.yaml"));
+    assert!(!offline.contains("curl"));
+    assert!(offline.contains("export PNPM_STORE_DIR=/opt/airgap/cache/pnpm"));
+    assert!(offline.contains(&format!("export PNPM_STORE_DIR={CLEAN_PNPM_STORE}")));
+
+    // Opting into install scripts drops the hardening flags from both attempts only.
+    let scripts_allowed = build_pr_script(&target, sha, &[], None, None, None, true, None);
+    assert_eq!(
+        scripts_allowed
+            .matches("pnpm install --frozen-lockfile --prefer-offline --store-dir \"$PNPM_STORE_DIR\" --child-concurrency=4")
+            .count(),
+        2
+    );
+}
+#[test]
 fn config_updates_are_atomic_and_validate_timeouts() {
     let mut state = RuntimeConfig {
         model: "original".into(),

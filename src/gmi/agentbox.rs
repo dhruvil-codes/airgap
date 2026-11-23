@@ -682,6 +682,81 @@ fn identifier(value: &Value, keys: &[&str]) -> Result<String> {
     Ok(id.into())
 }
 
+/// Package stores baked into warm sandbox templates by the operator. They are used only when
+/// present and writable; otherwise installs use a per-sandbox local store.
+pub const PREWARMED_PNPM_STORE: &str = "/opt/airgap/cache/pnpm";
+pub const PREWARMED_CARGO_HOME: &str = "/opt/airgap/cache/cargo";
+const LEGACY_PNPM_STORE: &str = "/opt/airgap/pnpm-store";
+pub const LOCAL_PNPM_STORE: &str = "/root/.local/share/pnpm/store";
+/// Empty store used to retry an install when a pre-warmed or hydrated store is missing packages or corrupt.
+pub const CLEAN_PNPM_STORE: &str = "/root/tmp/pnpm-store-clean";
+const MAX_CACHE_ARCHIVE_BYTES: u64 = 4 * 1024 * 1024 * 1024;
+
+/// Shell lines that pick the pnpm store and `CARGO_HOME`, preferring pre-warmed template caches.
+/// Sets `AIRGAP_PNPM_CACHED=1` when the chosen store was not created fresh for this run.
+pub fn package_store_setup() -> String {
+    format!(
+        r#"AIRGAP_PNPM_CACHED=0
+if [ -d {prewarmed} ] && [ -w {prewarmed} ]; then
+  export PNPM_STORE_DIR={prewarmed}
+  AIRGAP_PNPM_CACHED=1
+  echo "AIRGAP_INFO: using pre-warmed pnpm store {prewarmed}" >&2
+elif [ -d {legacy} ] && [ -w {legacy} ]; then
+  export PNPM_STORE_DIR={legacy}
+  AIRGAP_PNPM_CACHED=1
+  echo "AIRGAP_INFO: using pre-warmed pnpm store {legacy}" >&2
+else
+  export PNPM_STORE_DIR={local}
+fi
+# pnpm re-hashes every store file against the lockfile integrity before linking it.
+export npm_config_verify_store_integrity=true
+if [ -d {cargo} ] && [ -w {cargo} ]; then
+  export CARGO_HOME={cargo}
+  echo "AIRGAP_INFO: using pre-warmed cargo home {cargo}" >&2
+fi"#,
+        prewarmed = PREWARMED_PNPM_STORE,
+        legacy = LEGACY_PNPM_STORE,
+        local = LOCAL_PNPM_STORE,
+        cargo = PREWARMED_CARGO_HOME,
+    )
+}
+
+/// Shell lines that fetch `<cache_base_url>/pnpm-<sha256(pnpm-lock.yaml)>.tar.zst` and unpack it
+/// into `$PNPM_STORE_DIR`. A missing, oversized, or corrupt archive is skipped so the install
+/// falls back to the network.
+pub fn pnpm_cache_hydration(cache_base_url: Option<&str>) -> String {
+    let Some(base) = cache_base_url else {
+        return String::new();
+    };
+    format!(
+        r#"if [ -f pnpm-lock.yaml ] && command -v curl >/dev/null 2>&1 && command -v zstd >/dev/null 2>&1; then
+  LOCK_HASH="$(sha256sum pnpm-lock.yaml | awk '{{print $1}}')"
+  case "$LOCK_HASH" in
+    *[!0-9a-f]*) LOCK_HASH="" ;;
+  esac
+  if [ "${{#LOCK_HASH}}" -eq 64 ]; then
+    CACHE_ARCHIVE=/root/tmp/pnpm-cache.tar.zst
+    if curl -fsSL --max-time 30 --max-filesize {max_bytes} {base_q}"/pnpm-${{LOCK_HASH}}.tar.zst" -o "$CACHE_ARCHIVE" 2>/dev/null \
+      && zstd -tq -T0 "$CACHE_ARCHIVE" 2>/dev/null; then
+      mkdir -p "$PNPM_STORE_DIR"
+      # Even a partial extraction leaves the store dirty, so mark it cached to enable the clean-store retry.
+      AIRGAP_PNPM_CACHED=1
+      if zstd -dcq -T0 "$CACHE_ARCHIVE" | tar --no-same-owner --no-same-permissions -xf - -C "$PNPM_STORE_DIR" 2>/dev/null; then
+        echo "AIRGAP_INFO: hydrated pnpm store from lockfile cache pnpm-${{LOCK_HASH}}" >&2
+      else
+        echo "AIRGAP_INFO: lockfile cache extraction failed; continuing with network install" >&2
+      fi
+    else
+      echo "AIRGAP_INFO: no usable lockfile cache for pnpm-${{LOCK_HASH}}; continuing with network install" >&2
+    fi
+    rm -f "$CACHE_ARCHIVE"
+  fi
+fi"#,
+        max_bytes = MAX_CACHE_ARCHIVE_BYTES,
+        base_q = shell_quote(base)
+    )
+}
+
 pub fn shell_quote(value: &str) -> String {
     format!("'{}'", value.replace('\'', "'\"'\"'"))
 }
