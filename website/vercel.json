@@ -1,0 +1,78 @@
+{
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "headers": [
+    {
+      "source": "/(.*)",
+      "headers": [
+        { "key": "Link", "value": "</.well-known/ard.json>; rel=\"ard\"; type=\"application/ard+json\", </llms.txt>; rel=\"describedby\"; type=\"text/plain\", </openapi.json>; rel=\"service-desc\"; type=\"application/openapi+json\", </.well-known/mcp.json>; rel=\"mcp\"; type=\"application/json\", </sitemap.xml>; rel=\"sitemap\"; type=\"application/xml\"" },
+        { "key": "X-Content-Type-Options", "value": "nosniff" }
+      ]
+    },
+    {
+      "source": "/((?:docs|guides|about|contact|privacy|terms|conditions)?)",
+      "headers": [{ "key": "Vary", "value": "Accept, User-Agent" }]
+    },
+    {
+      "source": "/(.*)\\.md",
+      "headers": [
+        { "key": "Content-Type", "value": "text/markdown; charset=utf-8" },
+        { "key": "Access-Control-Allow-Origin", "value": "*" },
+        { "key": "Cache-Control", "value": "public, max-age=600" }
+      ]
+    },
+    {
+      "source": "/(llms|llms-full)\\.txt",
+      "headers": [
+        { "key": "Content-Type", "value": "text/plain; charset=utf-8" },
+        { "key": "Access-Control-Allow-Origin", "value": "*" },
+        { "key": "Cache-Control", "value": "public, max-age=600" }
+      ]
+    },
+    {
+      "source": "/.well-known/(.*)",
+      "headers": [
+        { "key": "Content-Type", "value": "application/json; charset=utf-8" },
+        { "key": "Access-Control-Allow-Origin", "value": "*" },
+        { "key": "Cache-Control", "value": "public, max-age=3600" }
+      ]
+    },
+    {
+      "source": "/.well-known/(ard|ai-catalog)\\.json",
+      "headers": [{ "key": "Content-Type", "value": "application/ard+json; charset=utf-8" }]
+    },
+    {
+      "source": "/(openapi\\.json|agent/(.*)\\.json)",
+      "headers": [
+        { "key": "Content-Type", "value": "application/json; charset=utf-8" },
+        { "key": "Access-Control-Allow-Origin", "value": "*" },
+        { "key": "Cache-Control", "value": "public, max-age=600" }
+      ]
+    },
+    {
+      "source": "/sitemap.xml",
+      "headers": [{ "key": "Content-Type", "value": "application/xml; charset=utf-8" }]
+    }
+  ],
+  "rewrites": [
+    { "source": "/.well-known/mcp", "destination": "/.well-known/mcp-manifest.json" },
+    { "source": "/.well-known/agent.json", "destination": "/.well-known/agent-card.json" },
+    { "source": "/swagger.json", "destination": "/openapi.json" },
+    { "source": "/api/openapi.json", "destination": "/openapi.json" },
+    { "source": "/ask", "destination": "/api/router?route=/ask" },
+    { "source": "/mcp", "destination": "/api/router?route=/mcp" },
+    { "source": "/a2a", "destination": "/api/router?route=/a2a" },
+    { "source": "/api", "destination": "/api/router?route=/api" },
+    { "source": "/api/:path*", "destination": "/api/router?route=/api/:path*" },
+    { "source": "/:page(docs|guides|about|contact|privacy|terms|conditions)", "destination": "/:page/index.html" },
+    {
+      "source": "/:path*",
+      "has": [{ "type": "header", "key": "accept", "value": ".*(text/markdown|application/json).*" }],
+      "destination": "/api/router?route=/__not_found/:path*"
+    },
+    {
+      "source": "/:path*",
+      "missing": [{ "type": "header", "key": "accept", "value": ".*text/html.*" }],
+      "destination": "/api/router?route=/__not_found/:path*"
+    }
+  ]
+}

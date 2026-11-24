@@ -4,6 +4,7 @@ description: Run your coding agent's installs, builds and tests in disposable Li
 version: 0.2.0
 license: MIT OR Apache-2.0
 repository: https://github.com/dhruvil-codes/airgap
+url: https://www.useairgap.dev/
 ---
 
 # airgap
@@ -104,10 +105,22 @@ Then ask in plain words: `use airgap to verify acme/api#142`, `use airgap and ru
 - **VERIFIED is strong evidence, not proof.** Receipts are unsigned SHA-256 records; zero-test runs are never marked verified.
 - **Not an official GMI Cloud product.** An independent project by [Dhruvil Mistry](https://github.com/dhruvil-codes).
 
+## For AI agents
+
+- Index for language models: https://www.useairgap.dev/llms.txt (everything in one file: https://www.useairgap.dev/llms-full.txt)
+- Read-only REST API: https://www.useairgap.dev/api/v1 (OpenAPI: https://www.useairgap.dev/openapi.json)
+- Ask a question: `GET https://www.useairgap.dev/ask?query=...` (NLWeb; `streaming=true` for SSE)
+- Docs MCP server (Streamable HTTP, no auth): https://www.useairgap.dev/mcp
+- A2A agent card: https://www.useairgap.dev/.well-known/agent-card.json
+
 ## Links
 
+- Docs: https://www.useairgap.dev/docs.md
+- Guides: https://www.useairgap.dev/guides.md
+- Setup: https://www.useairgap.dev/docs/setup.md
+- Reference: https://www.useairgap.dev/docs/reference.md
+- Hosting: https://www.useairgap.dev/docs/hosting.md
+- Changelog: https://www.useairgap.dev/CHANGELOG.md
+- About: https://www.useairgap.dev/about.md
+- Contact: https://www.useairgap.dev/contact.md
 - Repository: https://github.com/dhruvil-codes/airgap
-- Setup: https://github.com/dhruvil-codes/airgap/blob/main/docs/setup.md
-- Reference: https://github.com/dhruvil-codes/airgap/blob/main/docs/reference.md
-- Hosting: https://github.com/dhruvil-codes/airgap/blob/main/docs/hosting.md
-- Changelog: https://github.com/dhruvil-codes/airgap/blob/main/CHANGELOG.md

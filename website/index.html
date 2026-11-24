@@ -5,10 +5,15 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>airgap: Run your coding agent in disposable microVMs</title>
     <meta name="description" content="Open-source MCP server that runs coding agent installs, builds and tests in disposable Linux microVMs, with injection scans and secret scrubbing." />
+    <meta name="keywords" content="airgap, airgap MCP server, MCP server, AI coding agent sandbox, microVM sandbox, Model Context Protocol, Claude Code, Cursor, prompt injection scanner, secret redaction, GMI Cloud AgentBox" />
     <meta name="theme-color" content="#f3f2ee" />
     <link rel="icon" type="image/svg+xml" href="%BASE_URL%favicon.svg" />
     <link rel="alternate" type="text/markdown" href="%BASE_URL%index.md" title="airgap (Markdown)" />
     <link rel="alternate" type="text/plain" href="%BASE_URL%llms.txt" title="llms.txt" />
+    <link rel="ard" type="application/ard+json" href="%BASE_URL%.well-known/ard.json" />
+    <link rel="service-desc" type="application/openapi+json" href="%BASE_URL%openapi.json" title="airgap website API" />
+    <link rel="mcp" type="application/json" href="%BASE_URL%.well-known/mcp.json" title="airgap docs MCP server" />
+    <link rel="sitemap" type="application/xml" href="%BASE_URL%sitemap.xml" />
     <link rel="canonical" href="https://www.useairgap.dev/" />
 
     <meta property="og:type" content="website" />
@@ -31,18 +36,44 @@
         "@context": "https://schema.org",
         "@graph": [
           {
-            "@type": "SoftwareApplication",
+            "@type": "WebSite",
+            "@id": "https://www.useairgap.dev/#website",
             "name": "airgap",
+            "url": "https://www.useairgap.dev/",
+            "description": "Docs and machine-readable resources for airgap, the open-source MCP server that runs AI coding agent commands in disposable Linux microVMs.",
+            "publisher": { "@id": "https://www.useairgap.dev/#author" }
+          },
+          {
+            "@type": "Person",
+            "@id": "https://www.useairgap.dev/#author",
+            "name": "Dhruvil Mistry",
+            "url": "https://github.com/dhruvil-codes",
+            "sameAs": ["https://github.com/dhruvil-codes"]
+          },
+          {
+            "@type": "SoftwareApplication",
+            "@id": "https://www.useairgap.dev/#software",
+            "name": "airgap",
+            "alternateName": ["airgap MCP server", "airgap-mcp"],
+            "keywords": "MCP server, AI coding agent sandbox, microVM, Model Context Protocol, prompt injection, secret redaction, supply-chain audit",
             "softwareVersion": "0.2.0",
             "applicationCategory": "DeveloperApplication",
             "operatingSystem": "Linux, macOS, Windows",
             "description": "Open-source Rust MCP server that runs AI coding agent commands, installs and tests in disposable Linux microVMs on GMI Cloud AgentBox v2, with prompt-injection scanning, supply-chain audits and secret redaction.",
             "license": ["https://opensource.org/licenses/MIT", "https://www.apache.org/licenses/LICENSE-2.0"],
             "codeRepository": "https://github.com/dhruvil-codes/airgap",
-            "url": "https://github.com/dhruvil-codes/airgap",
+            "url": "https://www.useairgap.dev/",
+            "sameAs": [
+              "https://github.com/dhruvil-codes/airgap",
+              "https://registry.modelcontextprotocol.io/v0/servers?search=io.github.dhruvil-codes/airgap"
+            ],
+            "downloadUrl": "https://github.com/dhruvil-codes/airgap/releases",
+            "installUrl": "https://www.useairgap.dev/docs#install",
+            "softwareHelp": { "@type": "CreativeWork", "url": "https://www.useairgap.dev/docs" },
+            "releaseNotes": "https://www.useairgap.dev/CHANGELOG.md",
             "programmingLanguage": "Rust",
             "offers": { "@type": "Offer", "price": "0", "priceCurrency": "USD" },
-            "author": { "@type": "Person", "name": "Dhruvil Mistry", "url": "https://github.com/dhruvil-codes" }
+            "author": { "@id": "https://www.useairgap.dev/#author" }
           },
           {
             "@type": "FAQPage",
@@ -84,6 +115,12 @@
         ]
       }
     </script>
+    <noscript>
+      <style>
+        /* Prerendered sections start hidden for their entrance animation; show them when scripts are off. */
+        #root [style*="opacity:0"] { opacity: 1 !important; transform: none !important; filter: none !important; }
+      </style>
+    </noscript>
   </head>
   <body>
     <div id="root"></div>
