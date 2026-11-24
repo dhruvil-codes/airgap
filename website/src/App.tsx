@@ -4,7 +4,8 @@ import { Header } from "./sections/Header";
 import { Hero } from "./sections/Hero";
 import { BentoSection } from "./sections/Bento";
 import { BoundarySection, FaqSection, GatesSection, SetupSection } from "./sections/Sections";
-import { CtaBanner, Footer, OgCard } from "./sections/Footer";
+import { CtaBanner, Footer } from "./sections/Footer";
+import { OgImage } from "./sections/OgImage";
 import GradualBlur from "@/components/GradualBlur";
 import { scrollToTarget } from "./smooth";
 import { BASE } from "./content";
@@ -48,11 +49,7 @@ export default function App() {
 
   if (new URLSearchParams(window.location.search).has("og")) {
     return (
-      <Tooltip.Provider>
-        <div className="og-solo">
-          <OgCard />
-        </div>
-      </Tooltip.Provider>
+      <OgImage />
     );
   }
   return (
