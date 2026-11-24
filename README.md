@@ -9,6 +9,17 @@
 
 **Disposable GMI AgentBox microVM execution, supply-chain auditing, and secret-redacting security boundary for AI coding agents.**
 
+<p align="center">
+  <a href="https://www.useairgap.dev"><img src="docs/assets/hero.png" alt="airgap website: Let your agent run anything. Just not on your machine." width="100%"></a>
+</p>
+
+<p align="center">
+  <a href="https://www.useairgap.dev"><b>Website</b></a> ·
+  <a href="https://www.useairgap.dev/docs"><b>Docs</b></a> ·
+  <a href="https://www.useairgap.dev/guides"><b>Guides</b></a> ·
+  <a href="#quickstart"><b>Quickstart</b></a>
+</p>
+
 > [!NOTE]
 > AI coding agents such as Claude Code, Cursor, Droid and Windsurf routinely run untrusted scripts, build unfamiliar repositories, reproduce issues and execute test suites. Doing that on a developer workstation exposes it to malicious install hooks, supply-chain attacks and credential theft. airgap is a local [Model Context Protocol](https://modelcontextprotocol.io/) server that moves that execution into disposable GMI cloud microVMs, and scrubs secrets locally before logs or untrusted text are shown or sent to a model. Submitted commands never run on your machine.
 
@@ -16,6 +27,13 @@
 > Early development. Offline tests and release builds pass on Linux, macOS and Windows. Live sandbox runs and inference work on the tested account; live patch verification currently gets HTTP 403 from GMI. See the [validation record](docs/validation.md).
 
 ## Architecture
+
+<p align="center">
+  <img src="docs/assets/boundary-flow.svg" alt="Animated diagram: the coding agent calls the local airgap server, untrusted text goes to GMI MaaS, the files you pass go to a fresh AgentBox microVM, and redacted logs come back." width="100%">
+</p>
+
+<details>
+<summary>Detailed component diagram</summary>
 
 ```mermaid
 flowchart LR
@@ -38,6 +56,8 @@ flowchart LR
     Airgap -->|"Compact Markdown Status Card"| Agent
 ```
 
+</details>
+
 Only files the agent passes explicitly are uploaded; the server never reads your working tree on its own. Sandbox output is redacted before it reaches the agent, and every sandbox is deleted after the run. The image template stays on GMI Cloud so later runs with the same image and instance type skip the build. Details: [architecture](docs/architecture.md) and [threat model](docs/security-model.md).
 
 ## Why airgap?
@@ -50,6 +70,12 @@ Only files the agent passes explicitly are uploaded; the server never reads your
 | Pre-execution dependency audit | None | None | `airgap_audit_supply` |
 | Secret scrubbing in logs | None | None | Automatic on sandbox output; `airgap_redact_secrets` for any text |
 | Prompt-injection defense | None | None | Model-assisted `airgap_scan_injection` |
+
+Every sandbox run and PR verification passes four gates in order. If one fails, the run stops there.
+
+<p align="center">
+  <img src="docs/assets/gate-stack.svg" alt="Animated diagram of the four security gates: injection scan, supply audit, microVM isolation and secret scrub." width="100%">
+</p>
 
 ## Quickstart
 
@@ -88,6 +114,10 @@ airgap doctor
 ```
 
 Doctor checks both keys, the MaaS gateway, AgentBox compute eligibility, the configured model, and every registered editor config, labeled by client and scope. It creates no billable resources.
+
+<p align="center">
+  <a href="https://www.useairgap.dev/#setup"><img src="docs/assets/setup.png" alt="Setup steps for each editor on the airgap website, with per-command copy buttons and a verified sandbox report." width="100%"></a>
+</p>
 
 ## Using it from your agent
 
@@ -168,6 +198,25 @@ Sandbox and verification cards have the same frame. Their duration includes remo
 │  sandbox.                                                                            │
 ╰──────────────────────────────────────────────────────────────────────────────────────╯
 ```
+
+## Product tour
+
+<table>
+  <tr>
+    <td width="50%"><a href="https://www.useairgap.dev/#boundary"><img src="docs/assets/how-it-works.png" alt="How one airgap call crosses the boundary"></a></td>
+    <td width="50%"><a href="https://www.useairgap.dev/#problem"><img src="docs/assets/features.png" alt="What airgap protects: the problems it solves"></a></td>
+  </tr>
+  <tr>
+    <td align="center"><b>How it works.</b> One call, from agent to microVM and back.</td>
+    <td align="center"><b>The problem and the fix.</b> Installs, builds and tests run off your machine.</td>
+  </tr>
+  <tr>
+    <td colspan="2"><a href="https://www.useairgap.dev/#gates"><img src="docs/assets/security-gates.png" alt="The four security gates on the airgap website"></a></td>
+  </tr>
+  <tr>
+    <td colspan="2" align="center"><b>Security gates.</b> Scan, audit, isolate, scrub.</td>
+  </tr>
+</table>
 
 ## Tools
 

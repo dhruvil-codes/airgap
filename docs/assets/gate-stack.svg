@@ -1,0 +1,144 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="920" height="480" viewBox="0 0 920 480" role="img" aria-labelledby="t d">
+  <title id="t">airgap security gates</title>
+  <desc id="d">Every sandbox run and PR verification passes four gates in order: injection scan, supply audit, microVM isolation and secret scrub.</desc>
+  <defs>
+    <filter id="glow" x="-50%" y="-50%" width="200%" height="200%">
+      <feGaussianBlur stdDeviation="4" result="b"/>
+      <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+    <linearGradient id="plate" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#1e222b"/><stop offset="1" stop-color="#15181f"/></linearGradient>
+    <linearGradient id="plateLive" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#461e0e"/><stop offset="1" stop-color="#26130b"/></linearGradient>
+    <radialGradient id="stage" cx="50%" cy="45%" r="70%"><stop offset="0" stop-color="#15181f"/><stop offset="1" stop-color="#0b0d11"/></radialGradient>
+    <pattern id="grid" width="24" height="24" patternUnits="userSpaceOnUse"><path d="M24 0H0V24" fill="none" stroke="rgba(255,255,255,0.04)"/></pattern>
+  </defs>
+  <style>
+    .sans { font-family: "Geist", "Geist Variable", ui-sans-serif, system-ui, -apple-system, "Segoe UI", Helvetica, Arial, sans-serif; }
+    .mono { font-family: "Geist Mono", "Geist Mono Variable", ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; }
+    .cap { font-size: 11px; letter-spacing: 1.4px; fill: #807d75; }
+    .hl { opacity: 0; animation: on 8s infinite both; }
+    .plate { animation: lift 8s infinite both; }
+    .p1 { animation-delay: 2s; } .p2 { animation-delay: 4s; } .p3 { animation-delay: 6s; }
+    .spine { animation: flow 1.2s linear infinite; }
+    @keyframes on { 0% { opacity: 0 } 3%, 22% { opacity: 1 } 26%, 100% { opacity: 0 } }
+    @keyframes lift { 0% { transform: translateY(0) } 3%, 22% { transform: translateY(-12px) } 26%, 100% { transform: translateY(0) } }
+    @keyframes flow { to { stroke-dashoffset: -14 } }
+    @media (prefers-reduced-motion: reduce) { .hl, .plate, .spine { animation: none; } .hl.p0 { opacity: 1; } }
+  </style>
+  <rect x="0.5" y="0.5" width="919" height="479" rx="18" fill="#f3f2ee" stroke="#dcd9d1"/>
+  <rect x="20" y="20" width="420" height="440" rx="12" fill="url(#stage)"/>
+  <rect x="20" y="20" width="420" height="440" rx="12" fill="url(#grid)" stroke="#1f232b"/>
+  
+  <g>
+    <rect x="36" y="36" width="169.6" height="24" rx="12" fill="#1a1d24" stroke="#2a2e38"/>
+    <circle cx="50" cy="48" r="3.5" fill="#ff5714"/>
+    <text x="62" y="52" class="mono" font-size="11" letter-spacing="1.2" fill="#c9c6bf">EXECUTION PIPELINE</text>
+  </g>
+  <line class="spine" x1="230" y1="70" x2="230" y2="444" stroke="#ff5714" stroke-opacity="0.6" stroke-dasharray="6 8"/>
+  
+    <g>
+      <polygon points="92,360 230,415 230,427 92,372" fill="#151820" stroke="rgba(255,255,255,0.16)"/>
+      <polygon points="230,415 368,360 368,372 230,427" fill="#101218" stroke="rgba(255,255,255,0.16)"/>
+      <polygon points="230,305 368,360 230,415 92,360" fill="url(#plate)" stroke="rgba(255,255,255,0.28)"/>
+      <polygon points="230,329.2 307.3,360 230,390.8 152.7,360" fill="none" stroke="rgba(255,255,255,0.2)" stroke-dasharray="4 4"/>
+      </g>
+    <g>
+      <polygon points="92,282 230,337 230,349 92,294" fill="#151820" stroke="rgba(255,255,255,0.16)"/>
+      <polygon points="230,337 368,282 368,294 230,349" fill="#101218" stroke="rgba(255,255,255,0.16)"/>
+      <polygon points="230,227 368,282 230,337 92,282" fill="url(#plate)" stroke="rgba(255,255,255,0.28)"/>
+      <polygon points="230,251.2 307.3,282 230,312.8 152.7,282" fill="none" stroke="rgba(255,255,255,0.2)" stroke-dasharray="4 4"/>
+      </g>
+    <g>
+      <polygon points="92,204 230,259 230,271 92,216" fill="#151820" stroke="rgba(255,255,255,0.16)"/>
+      <polygon points="230,259 368,204 368,216 230,271" fill="#101218" stroke="rgba(255,255,255,0.16)"/>
+      <polygon points="230,149 368,204 230,259 92,204" fill="url(#plate)" stroke="rgba(255,255,255,0.28)"/>
+      <polygon points="230,173.2 307.3,204 230,234.8 152.7,204" fill="none" stroke="rgba(255,255,255,0.2)" stroke-dasharray="4 4"/>
+      </g>
+    <g>
+      <polygon points="92,126 230,181 230,193 92,138" fill="#151820" stroke="rgba(255,255,255,0.16)"/>
+      <polygon points="230,181 368,126 368,138 230,193" fill="#101218" stroke="rgba(255,255,255,0.16)"/>
+      <polygon points="230,71 368,126 230,181 92,126" fill="url(#plate)" stroke="rgba(255,255,255,0.28)"/>
+      <polygon points="230,95.2 307.3,126 230,156.8 152.7,126" fill="none" stroke="rgba(255,255,255,0.2)" stroke-dasharray="4 4"/>
+      </g>
+    <g class="plate p0"><g class="hl p0">
+        <polygon points="92,126 230,181 230,193 92,138" fill="#321b12" stroke="#ff5714"/>
+        <polygon points="230,181 368,126 368,138 230,193" fill="#26140d" stroke="#ff5714"/>
+        <polygon points="230,71 368,126 230,181 92,126" fill="url(#plateLive)" stroke="#ff824d" stroke-width="1.4" filter="url(#glow)"/>
+        <polygon points="230,95.2 307.3,126 230,156.8 152.7,126" fill="none" stroke="rgba(255,165,120,0.7)" stroke-dasharray="4 4"/>
+        <polygon points="209.2,121 230,131.4 230,144.4 209.2,134" fill="#b83a0b" stroke="#ff7a42" stroke-width="0.8"/>
+        <polygon points="230,131.4 250.8,121 250.8,134 230,144.4" fill="#8c2a07" stroke="#ff7a42" stroke-width="0.8"/>
+        <polygon points="230,110.6 250.8,121 230,131.4 209.2,121" fill="#ff5714" stroke="#ffb08c" stroke-width="0.8"/>
+      </g></g>
+    <g class="plate p1"><g class="hl p1">
+        <polygon points="92,204 230,259 230,271 92,216" fill="#321b12" stroke="#ff5714"/>
+        <polygon points="230,259 368,204 368,216 230,271" fill="#26140d" stroke="#ff5714"/>
+        <polygon points="230,149 368,204 230,259 92,204" fill="url(#plateLive)" stroke="#ff824d" stroke-width="1.4" filter="url(#glow)"/>
+        <polygon points="230,173.2 307.3,204 230,234.8 152.7,204" fill="none" stroke="rgba(255,165,120,0.7)" stroke-dasharray="4 4"/>
+        <polygon points="209.2,199 230,209.4 230,222.4 209.2,212" fill="#b83a0b" stroke="#ff7a42" stroke-width="0.8"/>
+        <polygon points="230,209.4 250.8,199 250.8,212 230,222.4" fill="#8c2a07" stroke="#ff7a42" stroke-width="0.8"/>
+        <polygon points="230,188.6 250.8,199 230,209.4 209.2,199" fill="#ff5714" stroke="#ffb08c" stroke-width="0.8"/>
+      </g></g>
+    <g class="plate p2"><g class="hl p2">
+        <polygon points="92,282 230,337 230,349 92,294" fill="#321b12" stroke="#ff5714"/>
+        <polygon points="230,337 368,282 368,294 230,349" fill="#26140d" stroke="#ff5714"/>
+        <polygon points="230,227 368,282 230,337 92,282" fill="url(#plateLive)" stroke="#ff824d" stroke-width="1.4" filter="url(#glow)"/>
+        <polygon points="230,251.2 307.3,282 230,312.8 152.7,282" fill="none" stroke="rgba(255,165,120,0.7)" stroke-dasharray="4 4"/>
+        <polygon points="209.2,277 230,287.4 230,300.4 209.2,290" fill="#b83a0b" stroke="#ff7a42" stroke-width="0.8"/>
+        <polygon points="230,287.4 250.8,277 250.8,290 230,300.4" fill="#8c2a07" stroke="#ff7a42" stroke-width="0.8"/>
+        <polygon points="230,266.6 250.8,277 230,287.4 209.2,277" fill="#ff5714" stroke="#ffb08c" stroke-width="0.8"/>
+      </g></g>
+    <g class="plate p3"><g class="hl p3">
+        <polygon points="92,360 230,415 230,427 92,372" fill="#321b12" stroke="#ff5714"/>
+        <polygon points="230,415 368,360 368,372 230,427" fill="#26140d" stroke="#ff5714"/>
+        <polygon points="230,305 368,360 230,415 92,360" fill="url(#plateLive)" stroke="#ff824d" stroke-width="1.4" filter="url(#glow)"/>
+        <polygon points="230,329.2 307.3,360 230,390.8 152.7,360" fill="none" stroke="rgba(255,165,120,0.7)" stroke-dasharray="4 4"/>
+        <polygon points="209.2,355 230,365.4 230,378.4 209.2,368" fill="#b83a0b" stroke="#ff7a42" stroke-width="0.8"/>
+        <polygon points="230,365.4 250.8,355 250.8,368 230,378.4" fill="#8c2a07" stroke="#ff7a42" stroke-width="0.8"/>
+        <polygon points="230,344.6 250.8,355 230,365.4 209.2,355" fill="#ff5714" stroke="#ffb08c" stroke-width="0.8"/>
+      </g></g>
+
+  <text x="500" y="50" class="mono cap">03 · SECURITY GATES</text>
+  <text x="880" y="50" text-anchor="end" class="mono cap">4 OF 4</text>
+  
+  <line x1="374" y1="126" x2="492" y2="126" stroke="#c8c4ba" stroke-dasharray="3 4"/>
+  <line class="hl p0" x1="374" y1="126" x2="492" y2="126" stroke="#ff5714" stroke-dasharray="3 4"/>
+  <rect x="500" y="95" width="380" height="62" rx="10" fill="#fbfaf7" stroke="#dcd9d1"/>
+  <rect class="hl p0" x="500" y="95" width="380" height="62" rx="10" fill="#ffe6da" stroke="#ff5714"/>
+  <text x="520" y="130" class="mono" font-size="12" fill="#807d75">01</text>
+  <text class="mono hl p0" x="520" y="130" font-size="12" fill="#ff5714">01</text>
+  <text x="558" y="123" class="sans" font-size="15" font-weight="600" fill="#111110">Injection scan</text>
+  <text x="558" y="142" class="mono" font-size="11" fill="#807d75">Before compute · airgap_scan_injection</text>
+  <circle cx="858" cy="126" r="3.5" fill="#c8c4ba"/>
+  <circle class="hl p0" cx="858" cy="126" r="3.5" fill="#ff5714"/>
+  <line x1="374" y1="204" x2="492" y2="204" stroke="#c8c4ba" stroke-dasharray="3 4"/>
+  <line class="hl p1" x1="374" y1="204" x2="492" y2="204" stroke="#ff5714" stroke-dasharray="3 4"/>
+  <rect x="500" y="173" width="380" height="62" rx="10" fill="#fbfaf7" stroke="#dcd9d1"/>
+  <rect class="hl p1" x="500" y="173" width="380" height="62" rx="10" fill="#ffe6da" stroke="#ff5714"/>
+  <text x="520" y="208" class="mono" font-size="12" fill="#807d75">02</text>
+  <text class="mono hl p1" x="520" y="208" font-size="12" fill="#ff5714">02</text>
+  <text x="558" y="201" class="sans" font-size="15" font-weight="600" fill="#111110">Supply audit</text>
+  <text x="558" y="220" class="mono" font-size="11" fill="#807d75">Before install · airgap_audit_supply</text>
+  <circle cx="858" cy="204" r="3.5" fill="#c8c4ba"/>
+  <circle class="hl p1" cx="858" cy="204" r="3.5" fill="#ff5714"/>
+  <line x1="374" y1="282" x2="492" y2="282" stroke="#c8c4ba" stroke-dasharray="3 4"/>
+  <line class="hl p2" x1="374" y1="282" x2="492" y2="282" stroke="#ff5714" stroke-dasharray="3 4"/>
+  <rect x="500" y="251" width="380" height="62" rx="10" fill="#fbfaf7" stroke="#dcd9d1"/>
+  <rect class="hl p2" x="500" y="251" width="380" height="62" rx="10" fill="#ffe6da" stroke="#ff5714"/>
+  <text x="520" y="286" class="mono" font-size="12" fill="#807d75">03</text>
+  <text class="mono hl p2" x="520" y="286" font-size="12" fill="#ff5714">03</text>
+  <text x="558" y="279" class="sans" font-size="15" font-weight="600" fill="#111110">MicroVM isolation</text>
+  <text x="558" y="298" class="mono" font-size="11" fill="#807d75">During execution · GMI AgentBox</text>
+  <circle cx="858" cy="282" r="3.5" fill="#c8c4ba"/>
+  <circle class="hl p2" cx="858" cy="282" r="3.5" fill="#ff5714"/>
+  <line x1="374" y1="360" x2="492" y2="360" stroke="#c8c4ba" stroke-dasharray="3 4"/>
+  <line class="hl p3" x1="374" y1="360" x2="492" y2="360" stroke="#ff5714" stroke-dasharray="3 4"/>
+  <rect x="500" y="329" width="380" height="62" rx="10" fill="#fbfaf7" stroke="#dcd9d1"/>
+  <rect class="hl p3" x="500" y="329" width="380" height="62" rx="10" fill="#ffe6da" stroke="#ff5714"/>
+  <text x="520" y="364" class="mono" font-size="12" fill="#807d75">04</text>
+  <text class="mono hl p3" x="520" y="364" font-size="12" fill="#ff5714">04</text>
+  <text x="558" y="357" class="sans" font-size="15" font-weight="600" fill="#111110">Secret scrub</text>
+  <text x="558" y="376" class="mono" font-size="11" fill="#807d75">Before return · automatic on output</text>
+  <circle cx="858" cy="360" r="3.5" fill="#c8c4ba"/>
+  <circle class="hl p3" cx="858" cy="360" r="3.5" fill="#ff5714"/>
+  <text x="500" y="442" class="sans" font-size="13" fill="#3b3a36">If a gate fails, the run stops there.</text>
+  <text x="500" y="460" class="sans" font-size="13" fill="#807d75">Nothing runs on your host.</text>
+</svg>

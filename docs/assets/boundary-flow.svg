@@ -1,0 +1,111 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="960" height="390" viewBox="0 0 960 390" role="img" aria-labelledby="t d">
+  <title id="t">How one airgap call crosses the boundary</title>
+  <desc id="d">The coding agent calls the local airgap MCP server. Untrusted text goes to GMI MaaS for an injection scan, only the files you pass go to a fresh AgentBox microVM, and redacted logs come back to the agent.</desc>
+  <defs>
+    <clipPath id="frame"><rect x="0.5" y="0.5" width="959" height="389" rx="18"/></clipPath>
+    <pattern id="dots" width="16" height="16" patternUnits="userSpaceOnUse"><circle cx="1" cy="1" r="1" fill="#dcd9d1"/></pattern>
+    <filter id="glow" x="-80%" y="-80%" width="260%" height="260%"><feGaussianBlur stdDeviation="3" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
+    <path id="p-scan" d="M320 180 C 480 180, 480 100, 640 100"/>
+    <path id="p-run" d="M320 210 H 640"/>
+    <path id="p-back" d="M640 240 H 320"/>
+  </defs>
+  <style>
+    .sans { font-family: "Geist", "Geist Variable", ui-sans-serif, system-ui, -apple-system, "Segoe UI", Helvetica, Arial, sans-serif; }
+    .mono { font-family: "Geist Mono", "Geist Mono Variable", ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; }
+    .cap { font-size: 11px; letter-spacing: 1.4px; fill: #807d75; }
+    .h { font-size: 15px; font-weight: 600; fill: #111110; }
+    .s { font-size: 11px; fill: #807d75; }
+    .tag { font-size: 10.5px; fill: #3b3a36; }
+    .wire { fill: none; stroke: #c8c4ba; stroke-width: 1.5; stroke-dasharray: 3 5; }
+    .edge { animation: march 1s linear infinite; }
+    .vm-on, .ok, .clean { opacity: 0; }
+    .vm-on { animation: vm 6s infinite; }
+    .ok { animation: ok 6s infinite; }
+    .clean { animation: clean 6s infinite; }
+    .bar { animation: bar 6s infinite; transform-box: fill-box; transform-origin: left center; transform: scaleX(0); }
+    @keyframes march { to { stroke-dashoffset: -12 } }
+    @keyframes vm { 0%, 46% { opacity: 0 } 50%, 66% { opacity: 1 } 72%, 100% { opacity: 0 } }
+    @keyframes bar { 0%, 48% { transform: scaleX(0); opacity: 1 } 66% { transform: scaleX(1); opacity: 1 } 72%, 100% { transform: scaleX(1); opacity: 0 } }
+    @keyframes ok { 0%, 88% { opacity: 0 } 91%, 99% { opacity: 1 } 100% { opacity: 0 } }
+    @keyframes clean { 0%, 18% { opacity: 0 } 21%, 32% { opacity: 1 } 36%, 100% { opacity: 0 } }
+    @media (prefers-reduced-motion: reduce) { .edge, .bar, .vm-on, .ok, .clean { animation: none; } .pk { display: none; } }
+  </style>
+
+  <rect x="0.5" y="0.5" width="959" height="389" rx="18" fill="#f3f2ee" stroke="#dcd9d1"/>
+  <rect x="1" y="1" width="958" height="388" rx="18" fill="url(#dots)" opacity="0.7"/>
+  <rect x="480" y="1" width="479" height="388" fill="#ebe9e3" opacity="0.6" clip-path="url(#frame)"/>
+
+  
+  <g>
+    <rect x="40" y="28" width="126.4" height="24" rx="12" fill="#fbfaf7" stroke="#dcd9d1"/>
+    <circle cx="54" cy="40" r="3.5" fill="#ff5714"/>
+    <text x="66" y="44" class="mono" font-size="11" letter-spacing="1.2" fill="#3b3a36">YOUR MACHINE</text>
+  </g>
+  
+  <g>
+    <rect x="808" y="28" width="104.8" height="24" rx="12" fill="#fbfaf7" stroke="#dcd9d1"/>
+    <circle cx="822" cy="40" r="3.5" fill="#ff5714"/>
+    <text x="834" y="44" class="mono" font-size="11" letter-spacing="1.2" fill="#3b3a36">GMI CLOUD</text>
+  </g>
+
+  <line class="edge" x1="480" y1="64" x2="480" y2="366" stroke="#ff5714" stroke-width="1.5" stroke-dasharray="6 6"/>
+  <rect x="424" y="28" width="112" height="24" rx="12" fill="#ff5714"/>
+  <text x="480" y="44" text-anchor="middle" class="mono" font-size="11" letter-spacing="1.4" fill="#fff">BOUNDARY</text>
+
+  <rect x="60" y="70" width="260" height="62" rx="10" fill="#fbfaf7" stroke="#dcd9d1" />
+  <text x="80" y="97" class="sans h">Coding agent</text>
+  <text x="80" y="116" class="mono s">Claude Code · Cursor · Droid</text>
+  <g class="ok"><rect x="224" y="80" width="76.4" height="22" rx="11" fill="#e1f0e6" stroke="#2c7a4b" stroke-opacity="0.5"/><text x="262.2" y="95" text-anchor="middle" class="mono" font-size="11" fill="#2c7a4b">VERIFIED</text></g>
+  <line x1="190" y1="132" x2="190" y2="164" stroke="#c8c4ba" stroke-width="1.5"/>
+  <polygon points="185,160 195,160 190,167" fill="#c8c4ba"/>
+
+  <rect x="60" y="168" width="260" height="86" rx="10" fill="#ffe6da" stroke="#ff5714"/>
+  <text x="80" y="196" class="sans h">airgap MCP server</text>
+  <text x="80" y="215" class="mono s" fill="#3b3a36">local Rust binary over stdio</text>
+  <rect x="80" y="226" width="106" height="18" rx="9" fill="#fbfaf7" stroke="#dcd9d1"/>
+  <text x="133" y="239" text-anchor="middle" class="mono tag">secret redactor</text>
+  <rect x="192" y="226" width="92" height="18" rx="9" fill="#fbfaf7" stroke="#dcd9d1"/>
+  <text x="238" y="239" text-anchor="middle" class="mono tag">supply audit</text>
+
+  <rect x="60" y="290" width="260" height="58" rx="10" fill="none" stroke="#c8c4ba" stroke-dasharray="4 4"/>
+  <text x="80" y="315" class="mono s" fill="#3b3a36">~/.ssh · cloud tokens · repo</text>
+  <text x="80" y="333" class="mono s">stay here unless you pass them</text>
+
+  <rect x="640" y="70" width="260" height="62" rx="10" fill="#fbfaf7" stroke="#dcd9d1" />
+  <text x="660" y="97" class="sans h">GMI MaaS</text>
+  <text x="660" y="116" class="mono s">prompt-injection classifier</text>
+  <g class="clean"><rect x="828" y="80" width="56" height="22" rx="11" fill="#e1f0e6" stroke="#2c7a4b" stroke-opacity="0.5"/><text x="856" y="95" text-anchor="middle" class="mono" font-size="11" fill="#2c7a4b">clean</text></g>
+
+  <rect x="640" y="168" width="260" height="86" rx="10" fill="#fbfaf7" stroke="#dcd9d1" />
+  <rect class="vm-on" x="640" y="168" width="260" height="86" rx="10" fill="#ffe6da" stroke="#ff5714"/>
+  <text x="660" y="196" class="sans h">AgentBox microVM</text>
+  <text x="660" y="215" class="mono s">fresh VM · deleted after the run</text>
+  <rect x="660" y="230" width="220" height="6" rx="3" fill="#ebe9e3" stroke="#dcd9d1" stroke-width="0.5"/>
+  <rect class="bar" x="660" y="230" width="220" height="6" rx="3" fill="#ff5714"/>
+
+  <rect x="640" y="290" width="260" height="58" rx="10" fill="#111110"/>
+  <text x="660" y="315" class="mono s" fill="#c9c6bf"><tspan fill="#ff5714">$</tspan> npm test</text>
+  <text x="660" y="333" class="mono s" fill="#8f8c84">38 passed · NPM_TOKEN=[REDACTED]</text>
+
+  <use href="#p-scan" class="wire"/>
+  <use href="#p-run" class="wire"/>
+  <use href="#p-back" class="wire"/>
+  <text x="358" y="166" class="mono tag" fill="#807d75">untrusted text</text>
+  <text x="528" y="203" class="mono tag" fill="#807d75">files you pass</text>
+  <text x="530" y="258" class="mono tag" fill="#807d75">redacted logs</text>
+
+  <g class="pk">
+    <circle r="5" fill="#ff5714" filter="url(#glow)" opacity="0">
+      <animateMotion dur="6s" repeatCount="indefinite" keyPoints="0;0;1;1" keyTimes="0;0.02;0.2;1" calcMode="linear"><mpath href="#p-scan"/></animateMotion>
+      <animate attributeName="opacity" dur="6s" repeatCount="indefinite" values="0;1;1;0;0" keyTimes="0;0.03;0.19;0.21;1"/>
+    </circle>
+    <circle r="5" fill="#ff5714" filter="url(#glow)" opacity="0">
+      <animateMotion dur="6s" repeatCount="indefinite" keyPoints="0;0;1;1" keyTimes="0;0.3;0.48;1" calcMode="linear"><mpath href="#p-run"/></animateMotion>
+      <animate attributeName="opacity" dur="6s" repeatCount="indefinite" values="0;0;1;1;0;0" keyTimes="0;0.3;0.31;0.47;0.49;1"/>
+    </circle>
+    <circle r="5" fill="#2c7a4b" filter="url(#glow)" opacity="0">
+      <animateMotion dur="6s" repeatCount="indefinite" keyPoints="0;0;1;1" keyTimes="0;0.7;0.88;1" calcMode="linear"><mpath href="#p-back"/></animateMotion>
+      <animate attributeName="opacity" dur="6s" repeatCount="indefinite" values="0;0;1;1;0;0" keyTimes="0;0.7;0.71;0.87;0.89;1"/>
+    </circle>
+  </g>
+</svg>
