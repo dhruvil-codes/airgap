@@ -5,7 +5,7 @@
 [![MCP](https://img.shields.io/badge/MCP-2024--11--05%20%2F%202025--11--25-purple)](https://modelcontextprotocol.io/)
 [![Platforms](https://img.shields.io/badge/platforms-Linux%20%7C%20macOS%20%7C%20Windows-lightgrey)](#quickstart)
 [![License](https://img.shields.io/badge/license-MIT%20OR%20Apache--2.0-blue)](#license)
-[![M8ven Trust Score](https://m8ven.ai/api/mcp/badge?repo=dhruvil-codes/airgap)](https://m8ven.ai/mcp/dhruvil-codes/airgap)
+[![M8ven Score](https://m8ven.ai/badge/mcp/dhruvil-codes-airgap-18iqsu?v=16768bd47f5aa81878ca6f0ee5389a3e)](https://m8ven.ai/mcp/dhruvil-codes-airgap-18iqsu?s=readme)
 
 **Disposable GMI AgentBox microVM execution, supply-chain auditing, and secret-redacting security boundary for AI coding agents.**
 
