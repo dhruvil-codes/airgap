@@ -1,0 +1,105 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>airgap: run your coding agent's commands in disposable Linux microVMs</title>
+    <meta
+      name="description"
+      content="airgap is an open-source Rust MCP server that runs your coding agent's installs, builds and tests in single-use Linux microVMs on GMI Cloud, with injection scans, supply-chain audits and secret scrubbing."
+    />
+    <meta name="theme-color" content="#f3f2ee" />
+    <link rel="icon" type="image/svg+xml" href="%BASE_URL%favicon.svg" />
+    <link rel="alternate" type="text/markdown" href="%BASE_URL%index.md" title="airgap (Markdown)" />
+    <link rel="alternate" type="text/plain" href="%BASE_URL%llms.txt" title="llms.txt" />
+    <link rel="canonical" href="https://useairgap.dev/" />
+
+    <meta property="og:type" content="website" />
+    <meta property="og:site_name" content="airgap" />
+    <meta property="og:url" content="https://useairgap.dev/" />
+    <meta property="og:title" content="airgap: let your agent run anything, just not on your machine" />
+    <meta
+      property="og:description"
+      content="Open-source MCP server that moves Claude Code, Cursor, VS Code and Factory Droid executions into disposable Linux microVMs."
+    />
+    <meta property="og:image" content="https://useairgap.dev/og.png" />
+    <meta property="og:image:width" content="1200" />
+    <meta property="og:image:height" content="630" />
+    <meta property="og:image:alt" content="airgap: Let your agent run anything. Just not on your machine." />
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content="airgap: let your agent run anything, just not on your machine" />
+    <meta
+      name="twitter:description"
+      content="Disposable Linux microVMs for coding agents, with injection scans, supply audits and secret scrubbing."
+    />
+    <meta name="twitter:image" content="https://useairgap.dev/og.png" />
+
+    <script type="application/ld+json">
+      {
+        "@context": "https://schema.org",
+        "@graph": [
+          {
+            "@type": "SoftwareApplication",
+            "name": "airgap",
+            "softwareVersion": "0.2.0",
+            "applicationCategory": "DeveloperApplication",
+            "operatingSystem": "Linux, macOS, Windows",
+            "description": "Open-source Rust MCP server that runs AI coding agent commands, installs and tests in disposable Linux microVMs on GMI Cloud AgentBox v2, with prompt-injection scanning, supply-chain audits and secret redaction.",
+            "license": ["https://opensource.org/licenses/MIT", "https://www.apache.org/licenses/LICENSE-2.0"],
+            "codeRepository": "https://github.com/dhruvil-codes/airgap",
+            "url": "https://github.com/dhruvil-codes/airgap",
+            "programmingLanguage": "Rust",
+            "offers": { "@type": "Offer", "price": "0", "priceCurrency": "USD" },
+            "author": { "@type": "Person", "name": "Dhruvil Mistry", "url": "https://github.com/dhruvil-codes" }
+          },
+          {
+            "@type": "FAQPage",
+            "mainEntity": [
+              {
+                "@type": "Question",
+                "name": "Is airgap really air-gapped?",
+                "acceptedAnswer": {
+                  "@type": "Answer",
+                  "text": "No. The name describes the boundary around your machine. GMI sandboxes have outbound internet, and files you send leave your computer."
+                }
+              },
+              {
+                "@type": "Question",
+                "name": "What leaves my machine?",
+                "acceptedAnswer": {
+                  "@type": "Answer",
+                  "text": "Only what you or your agent pass explicitly: the files in a tool call, the command, and text sent for injection scans or audits."
+                }
+              },
+              {
+                "@type": "Question",
+                "name": "Which agents does airgap work with?",
+                "acceptedAnswer": {
+                  "@type": "Answer",
+                  "text": "airgap setup configures Claude Code, Cursor, VS Code and Factory Droid. Any other stdio MCP client, Windsurf included, can use the JSON config."
+                }
+              },
+              {
+                "@type": "Question",
+                "name": "Is airgap an official GMI Cloud product?",
+                "acceptedAnswer": {
+                  "@type": "Answer",
+                  "text": "No. airgap is an independent open-source project that uses GMI Cloud AgentBox v2 for sandboxes and GMI MaaS for inference."
+                }
+              }
+            ]
+          }
+        ]
+      }
+    </script>
+  </head>
+  <body>
+    <div id="root"></div>
+    <noscript>
+      airgap is an open-source Rust MCP server that runs coding-agent commands in disposable Linux microVMs. Read
+      <a href="%BASE_URL%index.md">index.md</a> or <a href="%BASE_URL%llms.txt">llms.txt</a>, or visit
+      <a href="https://github.com/dhruvil-codes/airgap">github.com/dhruvil-codes/airgap</a>.
+    </noscript>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>

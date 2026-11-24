@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
+  <title>airgap</title>
+  <rect width="64" height="64" rx="14" fill="#111110"/>
+  <g fill="#f3f2ee" transform="translate(6.4 6.4) scale(0.8)">
+    <path d="M35.4 10L52.6 20Q56 22 52.6 24L35.4 34Q32 36 28.6 34L11.4 24Q8 22 11.4 20L28.6 10Q32 8 35.4 10Z" />
+    <path d="M11.4 32L28.6 42Q32 44 35.4 42L52.6 32Q56 30 56 33.8V38.8Q56 42 52.6 44L35.4 54Q32 56 28.6 54L11.4 44Q8 42 8 38.8V33.8Q8 30 11.4 32Z" />
+  </g>
+</svg>

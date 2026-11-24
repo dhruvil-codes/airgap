@@ -1,0 +1,6 @@
+User-agent: *
+Allow: /
+
+# Machine-readable summaries for AI agents
+# /llms.txt
+# /index.md
