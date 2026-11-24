@@ -1,6 +1,6 @@
 {
   "$schema": "https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json",
-  "name": "com.useairgap/airgap",
+  "name": "dev.useairgap/airgap",
   "title": "airgap",
   "description": "Zero-trust microVM execution boundary for AI coding agents with secret redaction.",
   "websiteUrl": "https://www.useairgap.dev",
@@ -8,7 +8,7 @@
     "url": "https://github.com/dhruvil-codes/airgap",
     "source": "github"
   },
-  "version": "0.2.0",
+  "version": "0.2.1",
   "keywords": [
     "sandbox",
     "security",
@@ -23,7 +23,7 @@
     {
       "registryType": "npm",
       "identifier": "airgap-mcp",
-      "version": "0.2.0",
+      "version": "0.2.1",
       "transport": {
         "type": "stdio"
       }

@@ -1,5 +1,5 @@
 "use strict";
-// Downloads, verifies and caches the airgap release binary that matches this package's version.
+// Downloads, verifies and caches the airgap release selected by airgapVersion in package.json.
 // Everything this module prints goes to stderr: stdout belongs to the MCP stdio protocol.
 const { createHash } = require("node:crypto");
 const { execFileSync, spawnSync } = require("node:child_process");
@@ -8,7 +8,9 @@ const os = require("node:os");
 const path = require("node:path");
 
 const REPO = "https://github.com/dhruvil-codes/airgap/releases/download";
-const VERSION = require("../package.json").version;
+const PACKAGE = require("../package.json");
+const PACKAGE_VERSION = PACKAGE.version;
+const VERSION = PACKAGE.airgapVersion || PACKAGE_VERSION;
 const MAX_ARCHIVE_BYTES = 256 * 1024 * 1024;
 
 function target(platform = process.platform, arch = process.arch) {
@@ -46,7 +48,7 @@ function log(message) {
 }
 
 async function download(url) {
-  const res = await fetch(url, { redirect: "follow", headers: { "user-agent": `airgap-mcp/${VERSION}` } });
+  const res = await fetch(url, { redirect: "follow", headers: { "user-agent": `airgap-mcp/${PACKAGE_VERSION}` } });
   if (!res.ok) throw new Error(`Download failed (${res.status}) for ${url}`);
   const length = Number(res.headers.get("content-length") || 0);
   if (length > MAX_ARCHIVE_BYTES) throw new Error("Release archive is unexpectedly large.");
@@ -102,4 +104,4 @@ async function install(version = VERSION, env = process.env) {
   return exe;
 }
 
-module.exports = { VERSION, target, assetName, cacheRoot, parseChecksum, argsFor, tarCommand, install };
+module.exports = { VERSION, PACKAGE_VERSION, target, assetName, cacheRoot, parseChecksum, argsFor, tarCommand, install };

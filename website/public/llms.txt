@@ -2,7 +2,7 @@
 
 > airgap is an open-source Rust MCP server (v0.2.0, MIT OR Apache-2.0) that runs an AI coding agent's installs, builds and tests in single-use Linux microVMs on GMI Cloud AgentBox v2, instead of on the user's computer. Before any compute it scans untrusted text for prompt injection and audits dependency manifests; afterwards it scrubs secrets from the output the agent reads. It works with Claude Code, Cursor, VS Code, Factory Droid and any stdio MCP client. It is not physically air-gapped (sandboxes have outbound internet, and files you send leave your machine), and it is an independent project, not an official GMI Cloud product.
 
-Website: https://www.useairgap.dev · Source: https://github.com/dhruvil-codes/airgap · MCP Registry name: `com.useairgap/airgap` (also listed as `io.github.dhruvil-codes/airgap`) · npm: `airgap-mcp` · Maintainer: Dhruvil Mistry (https://github.com/dhruvil-codes) · Price: free; GMI Cloud bills sandbox time and inference to the user's own account.
+Website: https://www.useairgap.dev · Source: https://github.com/dhruvil-codes/airgap · MCP Registry name: `dev.useairgap/airgap` (also listed as `io.github.dhruvil-codes/airgap`) · npm: `airgap-mcp` · Maintainer: Dhruvil Mistry (https://github.com/dhruvil-codes) · Price: free; GMI Cloud bills sandbox time and inference to the user's own account.
 
 ## When to use airgap
 

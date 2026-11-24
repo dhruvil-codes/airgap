@@ -2,7 +2,7 @@
 const test = require("node:test");
 const assert = require("node:assert/strict");
 const path = require("node:path");
-const { target, assetName, cacheRoot, parseChecksum, argsFor, tarCommand, VERSION } = require("../lib/launcher.js");
+const { target, assetName, cacheRoot, parseChecksum, argsFor, tarCommand, VERSION, PACKAGE_VERSION } = require("../lib/launcher.js");
 const pkg = require("../package.json");
 
 test("maps every supported platform to a published release asset", () => {
@@ -53,9 +53,11 @@ test("uses Windows' own tar so zip archives extract", () => {
 });
 
 test("package metadata satisfies npx and the MCP Registry", () => {
-  assert.equal(VERSION, pkg.version);
+  assert.equal(VERSION, "0.2.0");
+  assert.equal(VERSION, pkg.airgapVersion);
+  assert.equal(PACKAGE_VERSION, pkg.version);
   assert.equal(pkg.bin["airgap-mcp"], "bin/airgap-mcp.js");
-  assert.equal(pkg.mcpName, "com.useairgap/airgap");
+  assert.equal(pkg.mcpName, "dev.useairgap/airgap");
   assert.match(pkg.name, /mcp/);
   assert.equal(pkg.homepage, "https://www.useairgap.dev");
   const server = require("../../server.json");
