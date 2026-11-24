@@ -5,12 +5,12 @@ import "./smooth";
 import { StrictMode } from "react";
 import { createRoot, hydrateRoot } from "react-dom/client";
 import App from "./App";
-import { registerWebMcpTools } from "./agent/webmcp";
 
 const root = document.getElementById("root");
 if (!root) throw new Error("Missing #root element in index.html");
 
 const og = new URLSearchParams(window.location.search).has("og");
+if (og) document.documentElement.dataset.og = "";
 const app = (
   <StrictMode>
     <App og={og} />
@@ -23,5 +23,3 @@ else {
   root.replaceChildren();
   createRoot(root).render(app);
 }
-
-registerWebMcpTools();

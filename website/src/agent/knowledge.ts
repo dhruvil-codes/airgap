@@ -9,8 +9,10 @@ export const SITE = {
   repo: "https://github.com/dhruvil-codes/airgap",
   author: { name: "Dhruvil Mistry", url: "https://github.com/dhruvil-codes" },
   contactEmail: "dhruvil@bydhruvil.in",
-  registryName: "io.github.dhruvil-codes/airgap",
-  registryUrl: "https://registry.modelcontextprotocol.io/v0/servers?search=io.github.dhruvil-codes/airgap",
+  registryName: "com.useairgap/airgap",
+  registryUrl: "https://registry.modelcontextprotocol.io/v0/servers?search=com.useairgap/airgap",
+  npmPackage: "airgap-mcp",
+  npmUrl: "https://www.npmjs.com/package/airgap-mcp",
   tagline: "Let your agent run anything. Just not on your machine.",
   summary:
     "airgap is an open-source Rust MCP server that runs an AI coding agent's installs, builds and tests in single-use Linux microVMs on GMI Cloud AgentBox v2. It scans untrusted text for prompt injection, audits dependency manifests before install, and redacts secrets from output.",
@@ -176,6 +178,7 @@ export const INSTALL_COMMANDS = [
   { platform: "macos", label: "macOS", command: "curl -fsSL https://raw.githubusercontent.com/dhruvil-codes/airgap/main/scripts/install.sh | bash" },
   { platform: "linux", label: "Linux", command: "curl -fsSL https://raw.githubusercontent.com/dhruvil-codes/airgap/main/scripts/install.sh | bash" },
   { platform: "windows", label: "Windows (PowerShell)", command: "irm https://raw.githubusercontent.com/dhruvil-codes/airgap/main/scripts/install.ps1 | iex" },
+  { platform: "npm", label: "npm (Node.js 18+)", command: "npx -y airgap-mcp" },
   { platform: "cargo", label: "From source with Cargo", command: "cargo install --git https://github.com/dhruvil-codes/airgap --locked" },
 ] as const;
 

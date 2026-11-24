@@ -1,0 +1,21 @@
+{
+  "name": "airgap-mcp",
+  "version": "0.2.0",
+  "description": "airgap MCP server: run your AI coding agent's installs, builds and tests in disposable Linux microVMs on GMI Cloud, with prompt-injection scanning, supply-chain audits and secret redaction.",
+  "mcpName": "com.useairgap/airgap",
+  "keywords": ["mcp", "mcp-server", "model-context-protocol", "sandbox", "microvm", "ai-agent", "security", "secret-redaction", "prompt-injection", "claude", "cursor"],
+  "homepage": "https://www.useairgap.dev",
+  "bugs": "https://github.com/dhruvil-codes/airgap/issues",
+  "repository": { "type": "git", "url": "git+https://github.com/dhruvil-codes/airgap.git", "directory": "npm" },
+  "license": "MIT OR Apache-2.0",
+  "author": "Dhruvil Mistry (https://github.com/dhruvil-codes)",
+  "bin": { "airgap-mcp": "bin/airgap-mcp.js" },
+  "main": "lib/launcher.js",
+  "files": ["bin/", "lib/", "README.md", "LICENSE-MIT", "LICENSE-APACHE"],
+  "engines": { "node": ">=18" },
+  "os": ["linux", "darwin", "win32"],
+  "cpu": ["x64", "arm64"],
+  "scripts": {
+    "test": "node --test"
+  }
+}

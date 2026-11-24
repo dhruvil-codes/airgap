@@ -51,7 +51,13 @@ function LoopWords() {
   const sizers = useRef<(HTMLSpanElement | null)[]>([]);
 
   useEffect(() => {
-    const measure = () => setWidths(sizers.current.map((el) => el?.getBoundingClientRect().width ?? 0));
+    // getBoundingClientRect reports zoomed (visual) pixels while the width is applied as a CSS length that the
+    // page zoom scales again, so convert back to layout pixels. Browsers without standardized zoom report 1.
+    const measure = () => {
+      const root = document.getElementById("root");
+      const scale = root?.offsetWidth ? root.getBoundingClientRect().width / root.offsetWidth : 1;
+      setWidths(sizers.current.map((el) => (el ? el.getBoundingClientRect().width / scale : 0)));
+    };
     measure();
     void document.fonts?.ready.then(measure);
     window.addEventListener("resize", measure);

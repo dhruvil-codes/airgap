@@ -34,8 +34,26 @@ html.lenis {
 }
 html {
   scroll-behavior: smooth;
-  scroll-padding-top: 72px;
+  scroll-padding-top: calc(72px * var(--page-zoom));
   -webkit-text-size-adjust: 100%;
+}
+/* Desktop renders at 90%. Media queries use the unzoomed viewport, so applying zoom only above the widest
+   breakpoint (1180px) avoids zoom-induced layout changes. vw/vh lengths divide by --page-zoom because zoom
+   scales them too. The fixed-size OG card (?og, marked data-og) opts out.
+   Zoom #root, not <html>: Floating UI mispositions popups inside a zoomed ancestor. Portalled popups stay
+   unzoomed on <body>, while their contents (.tip, .nav-bridge) use the page scale. */
+#root,
+.tip,
+.nav-bridge {
+  zoom: var(--page-zoom);
+}
+:root {
+  --page-zoom: 1;
+}
+@media (min-width: 1181px) {
+  :root:not([data-og]) {
+    --page-zoom: 0.9;
+  }
 }
 html,
 body {
@@ -224,14 +242,14 @@ pre {
 
 /* ---------- type ---------- */
 .h1 {
-  font-size: clamp(40px, 5.8vw, 80px);
+  font-size: clamp(40px, calc(5.8vw / var(--page-zoom)), 80px);
   line-height: 0.98;
   letter-spacing: -0.045em;
   font-weight: 600;
   text-wrap: balance;
 }
 .h2 {
-  font-size: clamp(30px, 4vw, 52px);
+  font-size: clamp(30px, calc(4vw / var(--page-zoom)), 52px);
   line-height: 1.04;
   letter-spacing: -0.035em;
   font-weight: 600;
@@ -584,7 +602,11 @@ pre {
   transition: none;
 }
 /* Zero-gap hover bridge so pointer never crosses dead space between trigger and popup */
+/* fit-content + auto margins keep the zoomed popup its own size and centred: Base UI sizes the unzoomed positioner
+   from the popup's layout (pre-zoom) width. Without page zoom both widths match and these are no-ops. */
 .nav-bridge {
+  width: fit-content;
+  margin-inline: auto;
   padding-top: 8px;
 }
 .nav-popup {
@@ -3876,7 +3898,7 @@ a:hover > .star-ic {
   position: sticky;
   top: 96px;
   align-self: start;
-  max-height: calc(100vh - 120px);
+  max-height: calc(100vh / var(--page-zoom) - 120px);
   overflow-y: auto;
 }
 .doc-toc-label {

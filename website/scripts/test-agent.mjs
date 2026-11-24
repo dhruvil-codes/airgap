@@ -15,7 +15,7 @@ const exists = (p) => stat(p).then(() => true, () => false);
 
 // Same-origin fetches from the function (data files, MCP resources/read) are served from dist/.
 globalThis.fetch = async (input) => {
-  const url = new URL(String(input instanceof Request ? input.url : input));
+  const url = new URL(String(input instanceof Request ? input.url : input), O);
   if (url.origin !== O) throw new Error(`unexpected fetch ${url}`);
   try {
     return new Response(await readDist(url.pathname), { status: 200 });
@@ -70,6 +70,9 @@ await test("search finds PR verification docs", async () => {
 await test("install and setup lookups", async () => {
   const win = await (await call("/api/router?route=/api/v1/install&platform=windows")).json();
   assert.match(win.install[0].command, /install\.ps1/);
+  const npm = await (await call("/api/router?route=/api/v1/install&platform=npm")).json();
+  assert.equal(npm.install[0].command, "npx -y airgap-mcp");
+  assert.match(npm.next[0], /^npx -y airgap-mcp setup/);
   await isJsonError(await call("/api/router?route=/api/v1/install&platform=amiga"), 404);
   const cursor = await (await call("/api/router?route=/api/v1/setup&client=cursor")).json();
   assert.equal(cursor.setup[0].command, "airgap setup --cursor --yes");
@@ -294,6 +297,31 @@ await test("llms.txt is well-formed and every link resolves", async () => {
       assert.equal(res.status, 200, href);
     } else assert.ok((await exists(join(dist, p))) || (await exists(join(dist, p, "index.html"))), href);
   }
+});
+await test("webmcp.js registers working tools from knowledge.json", async () => {
+  const html = await readDist("/index.html");
+  assert.match(html, /<script src="\/webmcp\.js" defer><\/script>/);
+  const src = await readDist("/webmcp.js");
+  assert.match(src, /navigator\.modelContext\.registerTool\(/);
+  const { runInNewContext } = await import("node:vm");
+  const registered = [];
+  let assigned = "";
+  const done = new Promise((resolve) => {
+    const navigator = { modelContext: { registerTool: (t) => { registered.push(t); if (registered.length === 5) resolve(); } } };
+    runInNewContext(src, { navigator, fetch: globalThis.fetch, window: { location: { assign: (u) => (assigned = u) } }, console, Object, JSON, Math, Number, String, encodeURIComponent });
+  });
+  // Relative fetches resolve against the site origin, as they do in the browser.
+  await Promise.race([done, new Promise((_, reject) => setTimeout(() => reject(new Error(`registered ${registered.length}/5`)), 3000))]);
+  const by = Object.fromEntries(registered.map((t) => [t.name, t]));
+  const text = async (name, args) => (await by[name].execute(args)).content[0].text;
+  assert.match(await text("airgap_get_install_command", { platform: by.airgap_get_install_command.inputSchema.properties.platform.enum[0] }), /airgap setup/);
+  assert.match(await text("airgap_get_install_command", { platform: "npm" }), /npx -y airgap-mcp setup/);
+  assert.match(await text("airgap_get_client_setup", { client: "cursor" }), /airgap setup --cursor/);
+  assert.equal(JSON.parse(await text("airgap_list_mcp_tools", {})).tools.length, 8);
+  assert.ok(JSON.parse(await text("airgap_search_docs", { query: "verify pull request" })).results.length > 0);
+  await by.airgap_open_page.execute({ page: "/docs", section: "tools" });
+  assert.equal(assigned, "/docs#tools");
+  assert.equal((await by.airgap_get_client_setup.execute({ client: "nope" })).isError, true);
 });
 await test("vercel.json sources have no nested groups (path-to-regexp rejects them)", async () => {
   const vercel = JSON.parse(await readFile(join(site, "vercel.json"), "utf8"));
