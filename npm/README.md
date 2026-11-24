@@ -6,6 +6,8 @@ airgap is an open-source Rust MCP server. It runs your AI coding agent's install
 
 This package is a small launcher. On first run it downloads the prebuilt airgap binary for your platform from [GitHub Releases](https://github.com/dhruvil-codes/airgap/releases), checks its SHA-256 checksum and version, and caches it. Then it starts airgap as a stdio MCP server.
 
+The npm package and airgap binary are versioned separately. This release of the launcher installs airgap 0.2.0, as recorded in `airgapVersion` in `package.json`.
+
 ## Use it with an MCP client
 
 ```json
@@ -45,6 +47,6 @@ Supported platforms: Linux, macOS and Windows on x64 or arm64. Node.js 18 or new
 - Website and docs: https://www.useairgap.dev
 - Docs for agents: https://www.useairgap.dev/llms.txt
 - Source: https://github.com/dhruvil-codes/airgap
-- MCP Registry: `com.useairgap/airgap`
+- MCP Registry: `dev.useairgap/airgap`
 
 License: MIT OR Apache-2.0.

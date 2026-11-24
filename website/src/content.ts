@@ -28,7 +28,7 @@ export const LINKS = {
   mit: `${REPO}/blob/main/LICENSE-MIT`,
   apache: `${REPO}/blob/main/LICENSE-APACHE`,
   securityModel: `${REPO}/blob/main/docs/security-model.md`,
-  mcpRegistry: "https://registry.modelcontextprotocol.io/v0/servers?search=com.useairgap/airgap",
+  mcpRegistry: "https://registry.modelcontextprotocol.io/v0/servers?search=dev.useairgap/airgap",
 } as const;
 
 export type NavLink = { href: string; title: string; desc: string; icon: LucideIcon; external?: boolean };
