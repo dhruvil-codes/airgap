@@ -1,5 +1,6 @@
 # airgap
 
+[![MCP Registry](https://img.shields.io/badge/MCP%20Registry-listed-ff5714?logo=modelcontextprotocol&logoColor=white)](https://registry.modelcontextprotocol.io/v0/servers?search=io.github.dhruvil-codes/airgap)
 [![CI](https://img.shields.io/github/actions/workflow/status/dhruvil-codes/airgap/ci.yml?branch=main&label=CI)](https://github.com/dhruvil-codes/airgap/actions/workflows/ci.yml)
 [![Rust 1.89+](https://img.shields.io/badge/Rust-1.89%2B-orange?logo=rust)](https://www.rust-lang.org/tools/install)
 [![MCP](https://img.shields.io/badge/MCP-2024--11--05%20%2F%202025--11--25-purple)](https://modelcontextprotocol.io/)
@@ -19,12 +20,6 @@
   <a href="https://www.useairgap.dev/guides"><b>Guides</b></a> ·
   <a href="#quickstart"><b>Quickstart</b></a>
 </p>
-
-> [!NOTE]
-> AI coding agents such as Claude Code, Cursor, Droid and Windsurf routinely run untrusted scripts, build unfamiliar repositories, reproduce issues and execute test suites. Doing that on a developer workstation exposes it to malicious install hooks, supply-chain attacks and credential theft. airgap is a local [Model Context Protocol](https://modelcontextprotocol.io/) server that moves that execution into disposable GMI cloud microVMs, and scrubs secrets locally before logs or untrusted text are shown or sent to a model. Submitted commands never run on your machine.
-
-> [!WARNING]
-> Early development. Offline tests and release builds pass on Linux, macOS and Windows. Live sandbox runs and inference work on the tested account; live patch verification currently gets HTTP 403 from GMI. See the [validation record](docs/validation.md).
 
 ## Architecture
 
@@ -262,6 +257,14 @@ cargo build --release --locked
 ```
 
 Tests run offline against local HTTP mocks and a real stdio child process; they need no GMI credentials and create no billable resources. On memory-constrained Windows machines, see [CONTRIBUTING.md](CONTRIBUTING.md).
+
+## Before you use it
+
+> [!NOTE]
+> AI coding agents such as Claude Code, Cursor, Droid and Windsurf routinely run untrusted scripts, build unfamiliar repositories, reproduce issues and execute test suites. Doing that on a developer workstation exposes it to malicious install hooks, supply-chain attacks and credential theft. airgap is a local [Model Context Protocol](https://modelcontextprotocol.io/) server that moves that execution into disposable GMI cloud microVMs, and scrubs secrets locally before logs or untrusted text are shown or sent to a model. Submitted commands never run on your machine.
+
+> [!WARNING]
+> Early development. Offline tests and release builds pass on Linux, macOS and Windows. Live sandbox runs and inference work on the tested account; live patch verification currently gets HTTP 403 from GMI. See the [validation record](docs/validation.md).
 
 ## License
 
