@@ -21,8 +21,8 @@ function routeShells(): Plugin {
   };
 }
 
-// public/CNAME serves the site from the root of useairgap.dev. Without a custom domain, GitHub Pages
-// would serve it from /airgap/: set base to that and every link built with at() follows.
+// Served from the domain root (Vercel, www.useairgap.dev). To host under a sub-path instead,
+// set base to it and every link built with at() follows.
 export default defineConfig(() => ({
   base: "/",
   plugins: [react(), routeShells()],
