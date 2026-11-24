@@ -295,6 +295,16 @@ await test("llms.txt is well-formed and every link resolves", async () => {
     } else assert.ok((await exists(join(dist, p))) || (await exists(join(dist, p, "index.html"))), href);
   }
 });
+await test("vercel.json sources have no nested groups (path-to-regexp rejects them)", async () => {
+  const vercel = JSON.parse(await readFile(join(site, "vercel.json"), "utf8"));
+  for (const r of [...vercel.headers, ...vercel.rewrites]) {
+    let depth = 0;
+    for (const ch of r.source.replace(/\\./g, "")) {
+      if (ch === "(") assert.ok(++depth === 1, r.source);
+      else if (ch === ")") depth--;
+    }
+  }
+});
 await test("vercel.json rewrites only target the router or real files", async () => {
   const vercel = JSON.parse(await readFile(join(site, "vercel.json"), "utf8"));
   for (const r of vercel.rewrites) {
