@@ -10,9 +10,19 @@
 
 **Disposable GMI AgentBox microVM execution, supply-chain auditing, and secret-redacting security boundary for AI coding agents.**
 
-<p align="center">
-  <a href="https://www.useairgap.dev"><img src="docs/assets/hero.png" alt="airgap website: Let your agent run anything. Just not on your machine." width="100%"></a>
-</p>
+## What is airgap?
+
+AI coding agents like Claude Code, Cursor and Droid often need to run code: install packages, build a project, run its tests, or try a fix from a pull request. Normally that code runs on your own computer, next to your SSH keys, cloud tokens and private files. If the code is malicious, your machine pays for it.
+
+airgap gives your agent a safe place to do that work instead. It is a small program that runs next to your editor. When your agent needs to run something, airgap sends only the files it needs to a fresh, throwaway Linux virtual machine on GMI Cloud, runs it there, and brings back the result. The virtual machine is deleted afterwards.
+
+Along the way it also:
+
+- checks issue and PR text for hidden instructions aimed at your agent,
+- warns about risky install scripts in `package.json`, `requirements.txt` or `Cargo.toml`,
+- removes passwords, tokens and keys from logs before your agent sees them.
+
+You keep working as usual. Ask your agent to "use airgap and run the tests", and it does the rest.
 
 <p align="center">
   <a href="https://www.useairgap.dev"><b>Website</b></a> ·
