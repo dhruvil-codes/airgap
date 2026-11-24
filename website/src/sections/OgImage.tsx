@@ -18,10 +18,13 @@ export function OgImage() {
         </h1>
         <p className="ogi-sub">Just not on your machine.</p>
         <div className="ogi-foot">
-          <span className="ogi-cta">
-            Get started at useairgap.dev <span aria-hidden="true">→</span>
+          <span className="ogi-cta-row">
+            <span className="ogi-cta">
+              Get started <span aria-hidden="true">→</span>
+            </span>
+            <span className="ogi-url">useairgap.dev</span>
           </span>
-          <span className="ogi-meta">Open-source MCP server · MicroVM sandbox</span>
+          <span className="ogi-meta">Install in one command · Open source · MIT OR Apache-2.0</span>
         </div>
       </div>
       <div className="ogi-art" aria-hidden="true">
