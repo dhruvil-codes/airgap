@@ -54,6 +54,7 @@ const SECTIONS: DocSection[] = [
           ["Platforms", "x86_64 and ARM64 on Linux, macOS and Windows"],
           ["Protocol", <>MCP over stdio ({c("airgap --mcp")}) or Streamable HTTP ({c("airgap serve")})</>],
           ["MCP Registry", ext(SITE.registryUrl, SITE.registryName)],
+          ["npm", <>{ext(SITE.npmUrl, SITE.npmPackage)} (run {c("npx -y airgap-mcp")})</>],
           ["Price", "Free. GMI Cloud bills sandbox time and inference to your own account."],
         ]}
       />
@@ -87,6 +88,7 @@ const SECTIONS: DocSection[] = [
         <li>{ext(LINKS.repo, "Source code on GitHub ↗")}</li>
         <li>{ext(LINKS.releases, "Releases and prebuilt binaries ↗")}</li>
         <li>{ext(SITE.registryUrl, "Official MCP Registry entry ↗")}</li>
+        <li>{ext(SITE.npmUrl, "npm package ↗")}</li>
         <li>{ext(LINKS.changelog, "Changelog ↗")}</li>
         <li>
           <a href={at("/contact")}>Contact the maintainer</a>

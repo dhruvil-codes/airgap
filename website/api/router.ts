@@ -95,7 +95,8 @@ const pick = <T extends Obj>(list: T[], key: string, value: unknown) => list.fin
 
 function installAnswer(k: Obj, platform?: string) {
   const list = platform ? (k.install as Obj[]).filter((i) => i.platform === platform) : (k.install as Obj[]);
-  return { install: list, next: ["airgap setup --yes   # or --claude, --cursor, --vscode, --droid", "airgap doctor", "Set GMI_AGENTBOX_API_KEY (sandboxes) and GMI_MAAS_API_KEY (scans and audits)."] };
+  const npm = platform === "npm";
+  return { install: list, next: [npm ? "npx -y airgap-mcp setup --yes   # or --claude, --cursor, --vscode, --droid" : "airgap setup --yes   # or --claude, --cursor, --vscode, --droid", npm ? "npx -y airgap-mcp doctor" : "airgap doctor", "Set GMI_AGENTBOX_API_KEY (sandboxes) and GMI_MAAS_API_KEY (scans and audits)."] };
 }
 
 function answer(data: Data, query: string) {
@@ -328,7 +329,7 @@ function rest(route: string, url: URL, data: Data) {
         { method: "GET", path: "/api/v1/tools" },
         { method: "GET", path: "/api/v1/tools/{name}" },
         { method: "GET", path: "/api/v1/search?q={text}&limit={n}" },
-        { method: "GET", path: "/api/v1/install?platform={macos|linux|windows|cargo}" },
+        { method: "GET", path: "/api/v1/install?platform={macos|linux|windows|npm|cargo}" },
         { method: "GET", path: "/api/v1/setup?client={claude-code|cursor|vscode|factory-droid|other}" },
         { method: "GET|POST", path: "/ask?query={text}" },
         { method: "POST", path: "/mcp" },
@@ -352,7 +353,7 @@ function rest(route: string, url: URL, data: Data) {
   }
   if (path === "/api/v1/install") {
     const platform = url.searchParams.get("platform") ?? undefined;
-    if (platform && !pick(k.install, "platform", platform)) return apiError(404, "unknown_platform", "platform must be one of macos, linux, windows, cargo.");
+    if (platform && !pick(k.install, "platform", platform)) return apiError(404, "unknown_platform", "platform must be one of macos, linux, windows, npm, cargo.");
     return json(installAnswer(k, platform));
   }
   if (path === "/api/v1/setup") {

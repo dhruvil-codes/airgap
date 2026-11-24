@@ -1,6 +1,6 @@
 # airgap
 
-[![MCP Registry](https://img.shields.io/badge/MCP%20Registry-listed-ff5714?logo=modelcontextprotocol&logoColor=white)](https://registry.modelcontextprotocol.io/v0/servers?search=io.github.dhruvil-codes/airgap)
+[![MCP Registry](https://img.shields.io/badge/MCP%20Registry-listed-ff5714?logo=modelcontextprotocol&logoColor=white)](https://registry.modelcontextprotocol.io/v0/servers?search=com.useairgap/airgap)
 [![CI](https://img.shields.io/github/actions/workflow/status/dhruvil-codes/airgap/ci.yml?branch=main&label=CI)](https://github.com/dhruvil-codes/airgap/actions/workflows/ci.yml)
 [![Rust 1.89+](https://img.shields.io/badge/Rust-1.89%2B-orange?logo=rust)](https://www.rust-lang.org/tools/install)
 [![MCP](https://img.shields.io/badge/MCP-2024--11--05%20%2F%202025--11--25-purple)](https://modelcontextprotocol.io/)
@@ -94,6 +94,13 @@ curl -fsSL https://raw.githubusercontent.com/dhruvil-codes/airgap/main/scripts/i
 ```powershell
 # Windows PowerShell
 irm https://raw.githubusercontent.com/dhruvil-codes/airgap/main/scripts/install.ps1 | iex
+```
+
+With Node.js 18+, you can run the MCP server without a global install. The npm launcher downloads and verifies the matching release, caches it, and passes any arguments through to airgap:
+
+```sh
+npx -y airgap-mcp                 # start the stdio MCP server
+npx -y airgap-mcp setup --yes     # or run the normal setup flow
 ```
 
 If no release is published yet, or you prefer source, use Cargo (Rust 1.89+ and a native linker):
