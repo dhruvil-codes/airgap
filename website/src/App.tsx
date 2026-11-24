@@ -13,13 +13,22 @@ import { DocsPage } from "./pages/Docs";
 import { GuidesPage } from "./pages/Guides";
 import { TermsPage } from "./pages/Terms";
 import { ConditionsPage } from "./pages/Conditions";
+import { AboutPage } from "./pages/About";
+import { ContactPage } from "./pages/Contact";
+import { PrivacyPage } from "./pages/Privacy";
+import { NotFoundPage } from "./pages/NotFound";
 
-const PAGES: Record<string, { title: string; Page: () => JSX.Element }> = {
+export const PAGES: Record<string, { title: string; Page: () => JSX.Element }> = {
   "/docs": { title: "Docs", Page: DocsPage },
   "/guides": { title: "Guides", Page: GuidesPage },
+  "/about": { title: "About", Page: AboutPage },
+  "/contact": { title: "Contact", Page: ContactPage },
+  "/privacy": { title: "Privacy", Page: PrivacyPage },
   "/terms": { title: "Terms", Page: TermsPage },
   "/conditions": { title: "Conditions of use", Page: ConditionsPage },
 };
+
+export const routeOf = (pathname: string) => pathname.slice(BASE.length).replace(/\/+$/, "").replace(/\/index\.html$/, "") || "/";
 
 function Home() {
   return (
@@ -35,19 +44,21 @@ function Home() {
   );
 }
 
-export default function App() {
-  const path = window.location.pathname.slice(BASE.length).replace(/\/+$/, "") || "/";
+// `path` is passed by the prerenderer; in the browser it comes from the URL so hydration renders the same route.
+export default function App({ path = routeOf(window.location.pathname), og = false }: { path?: string; og?: boolean }) {
   const page = PAGES[path];
+  const missing = !page && path !== "/";
 
   useEffect(() => {
     if (page) document.title = `${page.title} · airgap`;
+    else if (missing) document.title = "Page not found · airgap";
     // Content mounts after the browser's own hash jump, so retry it once React has rendered.
     const id = decodeURIComponent(window.location.hash.slice(1));
     const el = id ? document.getElementById(id) : null;
     if (el) requestAnimationFrame(() => scrollToTarget(el, true));
-  }, [page]);
+  }, [page, missing]);
 
-  if (new URLSearchParams(window.location.search).has("og")) {
+  if (og) {
     return (
       <OgImage />
     );
@@ -58,7 +69,7 @@ export default function App() {
         Skip to content
       </a>
       <Header />
-      <main id="main">{page ? <page.Page /> : <Home />}</main>
+      <main id="main">{page ? <page.Page /> : missing ? <NotFoundPage /> : <Home />}</main>
       <Footer />
       <GradualBlur target="page" position="bottom" height="4.5rem" strength={1.6} layers={6} curve="bezier" autoHide zIndex={30} />
     </Tooltip.Provider>

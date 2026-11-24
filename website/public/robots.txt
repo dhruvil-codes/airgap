@@ -1,6 +1,16 @@
+# airgap: https://www.useairgap.dev
+# Search engines, AI search, AI assistants and agents acting for a user may all crawl and read this site.
 User-agent: *
 Allow: /
+Content-Signal: search=yes, ai-input=yes
 
-# Machine-readable summaries for AI agents
-# /llms.txt
-# /index.md
+Sitemap: https://www.useairgap.dev/sitemap.xml
+
+# Machine-readable resources for AI agents:
+#   https://www.useairgap.dev/llms.txt
+#   https://www.useairgap.dev/llms-full.txt
+#   https://www.useairgap.dev/index.md (every page has a .md twin)
+#   https://www.useairgap.dev/openapi.json
+#   https://www.useairgap.dev/.well-known/mcp.json
+#   https://www.useairgap.dev/.well-known/agent-card.json
+#   https://www.useairgap.dev/.well-known/ard.json

@@ -139,6 +139,7 @@ export const FOOTER_COLUMNS: { heading: string; links: { label: string; href: st
       { label: "Docs", href: at("/docs") },
       { label: "Guides", href: at("/guides") },
       { label: "Changelog", href: LINKS.changelog, external: true },
+      { label: "Releases", href: LINKS.releases, external: true },
       { label: "llms.txt", href: at("/llms.txt") },
     ],
   },
@@ -147,6 +148,7 @@ export const FOOTER_COLUMNS: { heading: string; links: { label: string; href: st
     links: [
       { label: "Terms", href: at("/terms") },
       { label: "Conditions", href: at("/conditions") },
+      { label: "Privacy", href: at("/privacy") },
       { label: "MIT license", href: LINKS.mit, external: true },
       { label: "Apache-2.0 license", href: LINKS.apache, external: true },
     ],
@@ -154,8 +156,9 @@ export const FOOTER_COLUMNS: { heading: string; links: { label: string; href: st
   {
     heading: "Community",
     links: [
+      { label: "About", href: at("/about") },
+      { label: "Contact", href: at("/contact") },
       { label: "GitHub", href: LINKS.repo, external: true },
-      { label: "Releases", href: LINKS.releases, external: true },
       { label: "Issues", href: LINKS.issues, external: true },
       { label: "Security policy", href: LINKS.security, external: true },
     ],
