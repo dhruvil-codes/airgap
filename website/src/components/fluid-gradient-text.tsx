@@ -1,4 +1,4 @@
-import { motion, useMotionValue, useSpring, useTransform } from "motion/react"
+import { m, useMotionValue, useSpring, useTransform } from "motion/react"
 
 export type FluidGradientTextProps = {
   /** Text content rendered inside the SVG. */
@@ -71,7 +71,7 @@ export function FluidGradientText({
           {text}
         </text>
         <defs>
-          <motion.linearGradient
+          <m.linearGradient
             id="fluid_gradient_text_linear"
             x1={gradientX1}
             y1="0"
@@ -81,7 +81,7 @@ export function FluidGradientText({
           >
             <stop offset="0.625" stopColor="currentColor" stopOpacity="0" />
             <stop offset="1" stopColor="currentColor" />
-          </motion.linearGradient>
+          </m.linearGradient>
         </defs>
       </svg>
     </div>

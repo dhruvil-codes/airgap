@@ -1,9 +1,7 @@
 // Component added by Ansh - github.com/ansh-dhanani (React Bits GradualBlur, ported to TypeScript)
-import { useEffect, useLayoutEffect, useMemo, useRef, type CSSProperties, type RefObject } from "react";
+import { useEffect, useMemo, useRef, type CSSProperties, type RefObject } from "react";
 
 import "./GradualBlur.css";
-
-const useIsomorphicLayoutEffect = typeof window !== "undefined" ? useLayoutEffect : useEffect;
 
 type Curve = "linear" | "bezier" | "ease-in" | "ease-out" | "ease-in-out";
 type Edge = "top" | "bottom" | "left" | "right";
@@ -150,7 +148,7 @@ const GradualBlur = ({
     return { steps, wash };
   }, [layers, curve, strength, exponential, saturation, duration, easing, edge, opacity, tint]);
 
-  useIsomorphicLayoutEffect(() => {
+  useEffect(() => {
     const root = rootRef.current;
     if (!root) return undefined;
     if (!autoHide) {
@@ -162,7 +160,18 @@ const GradualBlur = ({
     const element = scroller instanceof Element ? (scroller as HTMLElement) : null;
     const start = edge === "top" || edge === "left";
 
-    const update = () => {
+    let frame = 0;
+    let reach = 1;
+    let lastReveal = "";
+
+    const measureReach = () => {
+      const box = root.getBoundingClientRect();
+      reach = Math.max(vertical ? box.height : box.width, 1);
+    };
+
+    const run = (remeasure: boolean) => {
+      frame = 0;
+      if (remeasure) measureReach();
       const page = document.documentElement;
       const offset = element
         ? vertical
@@ -178,24 +187,34 @@ const GradualBlur = ({
         : vertical
           ? page.scrollHeight - window.innerHeight
           : page.scrollWidth - window.innerWidth;
-      const box = root.getBoundingClientRect();
-      const reach = Math.max(vertical ? box.height : box.width, 1);
       const room = start ? offset : limit - offset;
-      root.style.setProperty("--gradual-blur-reveal", clamp01(room / reach).toFixed(3));
+      const next = clamp01(room / reach).toFixed(3);
+      if (next !== lastReveal) {
+        lastReveal = next;
+        root.style.setProperty("--gradual-blur-reveal", next);
+      }
     };
 
-    update();
+    const schedule = (remeasure = false) => {
+      if (frame) return;
+      frame = requestAnimationFrame(() => run(remeasure));
+    };
+
+    schedule(true);
+    const onScroll = () => schedule(false);
+    const onResize = () => schedule(true);
     const source: HTMLElement | Window = element ?? window;
-    source.addEventListener("scroll", update, { passive: true });
-    window.addEventListener("resize", update);
-    const observer = element && typeof ResizeObserver !== "undefined" ? new ResizeObserver(update) : null;
+    source.addEventListener("scroll", onScroll, { passive: true });
+    window.addEventListener("resize", onResize, { passive: true });
+    const observer = element && typeof ResizeObserver !== "undefined" ? new ResizeObserver(onResize) : null;
     if (observer && element) {
       observer.observe(element);
       if (element.firstElementChild) observer.observe(element.firstElementChild);
     }
     return () => {
-      source.removeEventListener("scroll", update);
-      window.removeEventListener("resize", update);
+      if (frame) cancelAnimationFrame(frame);
+      source.removeEventListener("scroll", onScroll);
+      window.removeEventListener("resize", onResize);
       observer?.disconnect();
     };
   }, [autoHide, container, target, edge, vertical]);

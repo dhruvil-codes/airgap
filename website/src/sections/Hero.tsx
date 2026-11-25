@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { Tabs } from "@base-ui/react/tabs";
-import { AnimatePresence, motion, useReducedMotion } from "motion/react";
+import { AnimatePresence, m, useReducedMotion } from "motion/react";
 import { ArrowRight, ArrowUpRight, Check, Star } from "lucide-react";
 import { AnimatedShinyText } from "@/components/ui/animated-shiny-text";
 import { CLIENTS, INSTALL, LINKS, VERSION, at } from "../content";
@@ -27,7 +27,7 @@ export function InstallTabs() {
           {current.prompt}
         </span>
         <AnimatePresence mode="popLayout" initial={false}>
-          <motion.code
+          <m.code
             key={current.value}
             initial={{ opacity: 0, filter: "blur(4px)", y: 4 }}
             animate={{ opacity: 1, filter: "blur(0px)", y: 0 }}
@@ -35,7 +35,7 @@ export function InstallTabs() {
             transition={{ duration: 0.22, ease: EASE }}
           >
             {current.command}
-          </motion.code>
+          </m.code>
         </AnimatePresence>
       </div>
     </Tabs.Root>
@@ -53,15 +53,23 @@ function LoopWords() {
   useEffect(() => {
     // getBoundingClientRect reports zoomed (visual) pixels while the width is applied as a CSS length that the
     // page zoom scales again, so convert back to layout pixels. Browsers without standardized zoom report 1.
+    let frame = 0;
     const measure = () => {
+      frame = 0;
       const root = document.getElementById("root");
       const scale = root?.offsetWidth ? root.getBoundingClientRect().width / root.offsetWidth : 1;
       setWidths(sizers.current.map((el) => (el ? el.getBoundingClientRect().width / scale : 0)));
     };
-    measure();
-    void document.fonts?.ready.then(measure);
-    window.addEventListener("resize", measure);
-    return () => window.removeEventListener("resize", measure);
+    const schedule = () => {
+      if (!frame) frame = window.requestAnimationFrame(measure);
+    };
+    schedule();
+    void document.fonts?.ready.then(schedule);
+    window.addEventListener("resize", schedule, { passive: true });
+    return () => {
+      if (frame) window.cancelAnimationFrame(frame);
+      window.removeEventListener("resize", schedule);
+    };
   }, []);
 
   useEffect(() => {
@@ -72,7 +80,7 @@ function LoopWords() {
 
   const word = LOOP_WORDS[i];
   return (
-    <motion.span
+    <m.span
       className="loop"
       aria-hidden="true"
       animate={widths[i] ? { width: widths[i] } : undefined}
@@ -86,9 +94,9 @@ function LoopWords() {
         ))}
       </span>
       <AnimatePresence mode="popLayout" initial={false}>
-        <motion.span key={word} className="loop-word">
+        <m.span key={word} className="loop-word">
           {[...word].map((ch, n) => (
-            <motion.span
+            <m.span
               key={n}
               className="loop-ch"
               initial={{ opacity: 0, y: "0.45em", filter: "blur(8px)" }}
@@ -97,11 +105,11 @@ function LoopWords() {
               transition={{ duration: 0.42, delay: n * 0.022, ease: EASE }}
             >
               {ch === " " ? "\u00a0" : ch}
-            </motion.span>
+            </m.span>
           ))}
-        </motion.span>
+        </m.span>
       </AnimatePresence>
-    </motion.span>
+    </m.span>
   );
 }
 const SIGNALS = [
@@ -122,16 +130,14 @@ function SignalPill() {
 
   const s = SIGNALS[i];
   return (
-    <motion.a
-      layout
+    <a
       className="pill signal"
       href={s.href}
       target="_blank"
       rel="noopener noreferrer"
-      transition={{ layout: { duration: 0.5, ease: EASE } }}
     >
       <AnimatePresence mode="popLayout" initial={false}>
-        <motion.span
+        <m.span
           key={s.href}
           className="signal-inner"
           initial={{ opacity: 0, y: 12, filter: "blur(4px)" }}
@@ -141,12 +147,12 @@ function SignalPill() {
         >
           <img className="signal-logo" src={s.logo} alt="" width={16} height={16} />
           <AnimatedShinyText shimmerWidth={90}>{s.text}</AnimatedShinyText>
-        </motion.span>
+        </m.span>
       </AnimatePresence>
-      <motion.span layout="position" className="signal-arrow" aria-hidden="true">
+      <span className="signal-arrow" aria-hidden="true">
         <ArrowUpRight size={13} strokeWidth={1.8} />
-      </motion.span>
-    </motion.a>
+      </span>
+    </a>
   );
 }
 export function Hero() {
@@ -154,12 +160,7 @@ export function Hero() {
     <section className="hero" id="top" aria-labelledby="hero-title">
       <div className="frame hero-frame">
         <Ticks />
-        <motion.div
-          className="hero-inner"
-          initial={{ opacity: 0, y: 16, filter: "blur(6px)" }}
-          animate={{ opacity: 1, y: 0, filter: "blur(0px)" }}
-          transition={{ duration: 0.65, ease: EASE }}
-        >
+        <div className="hero-inner">
           <SignalPill />
           <h1 id="hero-title" className="h1">
             <span className="sr-only">Let your agent run anything. Just not on your machine.</span>
@@ -193,7 +194,7 @@ export function Hero() {
               </li>
             ))}
           </ul>
-        </motion.div>
+        </div>
       </div>
       <div className="frame clients-frame clients-frame--single">
         <div className="clients">

@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { Tabs } from "@base-ui/react/tabs";
-import { motion, useInView, useReducedMotion } from "motion/react";
+import { m, useInView, useReducedMotion } from "motion/react";
 import { Check, Circle, Loader, OctagonX, RotateCcw, ShieldAlert } from "lucide-react";
 import { EASE, cx } from "../lib";
 
@@ -282,13 +282,13 @@ export function BoundaryScene() {
                 })}
               </g>
             ))}
-            <motion.g
+            <m.g
               animate={{ y: vmLive ? -6 : 0, opacity: st("vm") === "skip" ? 0.35 : 1 }}
               transition={{ duration: 0.6, ease: EASE }}
             >
               <Box x={320} y={10} w={100} d={100} z={78} h={20} className={cx("vm", vmLive && "vm--live")} />
               <polygon className="vm-core" points={pts([[345, 35, 98.5], [395, 35, 98.5], [395, 85, 98.5], [345, 85, 98.5]])} />
-            </motion.g>
+            </m.g>
 
             <Callout at={[52, 60, 68]} label="Your machine" sub="agent + keys + files" rise={40} />
             <Callout at={[142, 5, 70]} label="Injection scan" sub="GMI MaaS" rise={56} status={st("scan")} />
@@ -297,7 +297,7 @@ export function BoundaryScene() {
             <Callout at={[400, 30, 104]} label="microVM" sub="fresh, then deleted" rise={40} status={st("vm")} />
             <Callout at={[202, 120, 0]} label="Secret scrub" sub="[REDACTED]" rise={-26} status={st("redact")} />
 
-            <motion.g
+            <m.g
               initial={false}
               animate={{ x: px, y: py }}
               transition={{ duration: reduce ? 0 : 0.85, ease: EASE }}
@@ -305,7 +305,7 @@ export function BoundaryScene() {
               <ellipse cx={0} cy={9} rx={7} ry={3.5} className="packet-shadow" />
               <circle r={5.5} className={cx("packet", finished && blocked && "packet--block")} />
               <circle r={10} className="packet-ring" />
-            </motion.g>
+            </m.g>
           </svg>
         </div>
 
@@ -332,7 +332,7 @@ export function BoundaryScene() {
                     <Icon size={13} strokeWidth={2} />
                   </span>
                   <span className="scene-step-name">{STAGE_LABEL[key]}</span>
-                  <motion.span
+                  <m.span
                       key={`${scenario.id}-${key}-${s}`}
                       className="scene-step-text"
                       initial={{ opacity: 0.35, y: 2 }}
@@ -346,7 +346,7 @@ export function BoundaryScene() {
                           : s === "active"
                             ? "running\u2026"
                             : (scenario.log[key] ?? "")}
-                  </motion.span>
+                  </m.span>
                 </li>
               );
             })}

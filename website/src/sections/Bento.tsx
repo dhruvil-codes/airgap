@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { motion, useReducedMotion } from "motion/react";
+import { m, useReducedMotion } from "motion/react";
 import { Cloud, FileCode2, KeyRound, Lock, PackageSearch, ScanText, Search, Terminal } from "lucide-react";
 import { NumberRoll, Reveal, Row, SectionHead, cx } from "../lib";
 import { at } from "../content";
@@ -69,7 +69,7 @@ function ClientsVisual() {
           <image href={c.logo} x="10" y="10" width="20" height="20" />
         </g>
       ))}
-      <motion.g
+      <m.g
         initial={false}
         animate={{ x: t.x + 6, y: t.y + 4 }}
         transition={{ type: "spring", stiffness: 140, damping: 18 }}
@@ -81,7 +81,7 @@ function ClientsVisual() {
           strokeWidth="1.2"
           strokeLinejoin="round"
         />
-      </motion.g>
+      </m.g>
     </svg>
   );
 }

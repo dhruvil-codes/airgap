@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { motion } from "motion/react";
+import { m } from "motion/react";
 import { EASE, cx } from "../lib";
 
 /* ───────────────────────────────────────────────────────────────────────────
@@ -248,7 +248,7 @@ export function GateStack({
         const labelPt = P(W + 10, H / 2, z + THICK / 2);
 
         return (
-          <motion.g
+          <m.g
             key={g.id}
             className={cx("iso-plate", isLive && "is-live")}
             animate={{ y: isLive ? -7 : 0 }}
@@ -444,7 +444,7 @@ export function GateStack({
                 {g.num}
               </text>
             </g>
-          </motion.g>
+          </m.g>
         );
       })}
     </svg>
@@ -528,7 +528,7 @@ export function GatesIso() {
           })}
         </div>
 
-        <motion.div
+        <m.div
           key={gate.id}
           className="iso-detail"
           initial={{ opacity: 0, y: 6 }}
@@ -556,7 +556,7 @@ export function GatesIso() {
               <span className="iso-rv iso-rv--ok">{gate.readout.verdict}</span>
             </div>
           </div>
-        </motion.div>
+        </m.div>
       </div>
     </div>
   );

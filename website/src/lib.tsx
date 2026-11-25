@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, type ReactNode } from "react";
-import { AnimatePresence, motion, useInView, useReducedMotion, useScroll, useSpring, useTransform } from "motion/react";
+import { AnimatePresence, m, useInView, useReducedMotion, useScroll, useSpring, useTransform } from "motion/react";
 import { Tooltip } from "@base-ui/react/tooltip";
 import { Check, Copy, X } from "lucide-react";
 import type { CodeLine } from "./content";
@@ -30,7 +30,7 @@ export function GithubIcon({ size = 16 }: { size?: number }) {
 export function ScrollProgress() {
   const { scrollYProgress } = useScroll();
   const scaleX = useSpring(scrollYProgress, { stiffness: 220, damping: 30, restDelta: 0.001 });
-  return <motion.div className="scroll-bar" style={{ scaleX }} aria-hidden="true" />;
+  return <m.div className="scroll-bar" style={{ scaleX }} aria-hidden="true" />;
 }
 
 export function Ticks() {
@@ -100,7 +100,7 @@ export function CopyButton({ value, label = "Copy" }: { value: string; label?: s
         }
       >
         <AnimatePresence initial={false} mode="popLayout">
-          <motion.span
+          <m.span
             key={state}
             className="copy-glyph"
             initial={{ opacity: 0, scale: 0.5, filter: "blur(3px)" }}
@@ -109,7 +109,7 @@ export function CopyButton({ value, label = "Copy" }: { value: string; label?: s
             transition={{ duration: 0.18, ease: EASE }}
           >
             <Glyph size={14} strokeWidth={1.8} />
-          </motion.span>
+          </m.span>
         </AnimatePresence>
       </Tooltip.Trigger>
       <Tooltip.Portal>
@@ -206,7 +206,7 @@ export function Reveal({
   as?: "div" | "li" | "article";
 }) {
   const reduce = useReducedMotion();
-  const Comp = as === "li" ? motion.li : as === "article" ? motion.article : motion.div;
+  const Comp = as === "li" ? m.li : as === "article" ? m.article : m.div;
   return (
     <Comp
       className={className}
@@ -237,9 +237,9 @@ export function ScrollFloat({
   });
   const y = useTransform(scrollYProgress, [0, 1], reduce ? [0, 0] : [offset, -offset]);
   return (
-    <motion.div ref={ref} className={className} style={{ y }}>
+    <m.div ref={ref} className={className} style={{ y }}>
       {children}
-    </motion.div>
+    </m.div>
   );
 }
 
@@ -247,7 +247,8 @@ export function NumberRoll({ value }: { value: string }) {
   const ref = useRef<HTMLSpanElement>(null);
   const inView = useInView(ref, { once: true, margin: "0px 0px -10% 0px" });
   return (
-    <span ref={ref} className="roll" aria-label={value}>
+    <span ref={ref} className="roll">
+      <span className="sr-only">{value}</span>
       {[...value].map((ch, i) => {
         const d = Number(ch);
         if (Number.isNaN(d)) {
@@ -259,7 +260,7 @@ export function NumberRoll({ value }: { value: string }) {
         }
         return (
           <span key={i} className="roll-window" aria-hidden="true">
-            <motion.span
+            <m.span
               className="roll-col"
               initial={{ y: "-90%" }}
               animate={{ y: inView ? `${-d * 10}%` : "-90%" }}
@@ -268,7 +269,7 @@ export function NumberRoll({ value }: { value: string }) {
               {Array.from({ length: 10 }, (_, n) => (
                 <span key={n}>{n}</span>
               ))}
-            </motion.span>
+            </m.span>
           </span>
         );
       })}

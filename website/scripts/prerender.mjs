@@ -136,12 +136,47 @@ function pageMarkdown(html, page) {
 }
 
 // ---------- HTML shells ----------
-const template = await readFile(join(dist, "index.html"), "utf8");
+let template = await readFile(join(dist, "index.html"), "utf8");
 if (!template.includes('<div id="root"></div>')) throw new Error("dist/index.html has no empty #root to fill");
+
+// Inline the main stylesheet to eliminate the render-blocking CSS request and preload primary Latin fonts
+// so the browser fetches them in parallel with JS instead of chaining HTML -> CSS -> font.
+const assetFiles = await readdir(join(dist, "assets"));
+const fontPreloads = assetFiles
+  .filter((f) => /^geist(?:-mono)?-latin-wght-normal-.*\.woff2$/.test(f))
+  .sort()
+  .map((f) => `    <link rel="preload" as="font" type="font/woff2" crossorigin href="/assets/${f}" />`)
+  .join("\n");
+
+const cssLinkRe = /<link rel="stylesheet"[^>]*href="(\/assets\/[^"]+\.css)"[^>]*>/;
+const cssMatch = template.match(cssLinkRe);
+if (cssMatch) {
+  const css = await readFile(join(dist, cssMatch[1].slice(1)), "utf8");
+  const safeCss = css.replace(/<\/style/gi, "<\\/style");
+  template = template.replace(cssLinkRe, `${fontPreloads ? `${fontPreloads}\n    ` : ""}<style>${safeCss}</style>`);
+} else if (fontPreloads) {
+  template = template.replace("</head>", `${fontPreloads}\n  </head>`);
+}
+
+// Preload the current route's lazy JS chunk in parallel with the entry script to avoid an entry -> route chain.
+const chunkByPrefix = (prefix) => assetFiles.find((f) => f.startsWith(`${prefix}-`) && f.endsWith(".js"));
+const routeChunk = (path) => {
+  if (path === "/") return chunkByPrefix("Home");
+  if (path === "/docs") return chunkByPrefix("Docs");
+  if (path === "/guides" || path.startsWith("/guides/")) return chunkByPrefix("Guides");
+  if (path === "/about") return chunkByPrefix("About");
+  if (path === "/contact") return chunkByPrefix("Contact");
+  if (path === "/privacy") return chunkByPrefix("Privacy");
+  if (path === "/terms") return chunkByPrefix("Terms");
+  if (path === "/conditions") return chunkByPrefix("Conditions");
+  return chunkByPrefix("NotFound");
+};
 
 function shell(page, html) {
   const url = page.path === "/" ? `${O}/` : `${O}${page.path}`;
   let out = template.replace('<div id="root"></div>', `<div id="root">${html}</div>`);
+  const chunk = routeChunk(page.path);
+  if (chunk) out = out.replace("</head>", `    <link rel="modulepreload" crossorigin href="/assets/${chunk}" />\n  </head>`);
   out = out.replace(/<title>[\s\S]*?<\/title>/, `<title>${esc(page.title)}</title>`);
   out = out.replace(/(<meta name="description" content=")[^"]*(")/, `$1${esc(page.description)}$2`);
   out = out.replace(/(<link rel="alternate" type="text\/markdown" href=")[^"]*(")/, `$1${page.markdown}$2`);
