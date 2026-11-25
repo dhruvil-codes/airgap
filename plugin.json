@@ -1,0 +1,22 @@
+{
+  "spec": "1.0.0",
+  "name": "airgap",
+  "version": "0.2.1",
+  "description": "Zero-trust microVM execution boundary for AI coding agents. Verify PRs, test patches, scan for prompt injection, audit dependency manifests, and scrub secrets from logs.",
+  "author": {
+    "name": "Dhruvil Mistry",
+    "url": "https://github.com/dhruvil-codes"
+  },
+  "homepage": "https://www.useairgap.dev",
+  "repository": "https://github.com/dhruvil-codes/airgap",
+  "license": "MIT OR Apache-2.0",
+  "keywords": [
+    "security",
+    "sandbox",
+    "microvm",
+    "mcp",
+    "prompt-injection",
+    "supply-chain",
+    "secret-redaction"
+  ]
+}
