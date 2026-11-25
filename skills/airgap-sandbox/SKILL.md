@@ -1,5 +1,5 @@
 ---
-name: airgap
+name: airgap-sandbox
 description: Isolate untrusted code execution, verify GitHub pull requests, scan for prompt injection, audit dependency manifests for supply-chain risks, and redact secrets from logs using the airgap MCP server.
 ---
 
