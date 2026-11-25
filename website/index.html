@@ -68,7 +68,17 @@
               "https://registry.modelcontextprotocol.io/v0/servers?search=dev.useairgap/airgap",
               "https://registry.modelcontextprotocol.io/v0/servers?search=io.github.dhruvil-codes/airgap",
               "https://www.npmjs.com/package/airgap-mcp",
-              "https://mcpservers.org/servers/dhruvil-codes/airgap"
+              "https://mcpservers.org/servers/dhruvil-codes/airgap",
+              "https://m8ven.ai/mcp/dhruvil-codes/airgap"
+            ],
+            "featureList": [
+              "Disposable remote Linux microVM execution on GMI AgentBox v2",
+              "Pre-execution prompt-injection classification via GMI MaaS",
+              "Supply-chain manifest auditing for npm, Python, and Cargo",
+              "Local secret and API key redaction in terminal logs",
+              "Unified git diff and PR patch verification",
+              "Native MCP stdio support for Claude Code, Cursor, and Factory Droid",
+              "Cross-platform npx launcher with automatic binary checksum verification"
             ],
             "downloadUrl": "https://github.com/dhruvil-codes/airgap/releases",
             "installUrl": "https://www.useairgap.dev/docs#install",
@@ -83,10 +93,10 @@
             "mainEntity": [
               {
                 "@type": "Question",
-                "name": "Is airgap really air-gapped?",
+                "name": "Is it really air-gapped?",
                 "acceptedAnswer": {
                   "@type": "Answer",
-                  "text": "No. The name describes the boundary around your machine. GMI sandboxes have outbound internet, and files you send leave your computer."
+                  "text": "No. The name describes the boundary around your machine. GMI sandboxes have outbound internet, and files you send leave your computer. Provider isolation, network policy, account permissions and image trust are still part of the security boundary."
                 }
               },
               {
@@ -94,23 +104,63 @@
                 "name": "What leaves my machine?",
                 "acceptedAnswer": {
                   "@type": "Answer",
-                  "text": "Only what you or your agent pass explicitly: the files in a tool call, the command, and text sent for injection scans or audits."
+                  "text": "Only what you or your agent pass explicitly: the files in a tool call, the command, and the text sent for injection scans or audits. airgap never uploads files implicitly and never reads your working tree for patch verification."
                 }
               },
               {
                 "@type": "Question",
-                "name": "Which agents does airgap work with?",
+                "name": "Does it stop my agent from using its own terminal?",
                 "acceptedAnswer": {
                   "@type": "Answer",
-                  "text": "airgap setup configures Claude Code, Cursor, VS Code and Factory Droid. Any other stdio MCP client, Windsurf included, can use the JSON config."
+                  "text": "No. Adding an MCP server does not disable an agent's other tools. airgap setup writes routing rules into AGENTS.md, CLAUDE.md and .cursorrules so the agent prefers airgap. If all execution must go through it, restrict your client's tool permissions too."
                 }
               },
               {
                 "@type": "Question",
-                "name": "Is airgap an official GMI Cloud product?",
+                "name": "What do I need to run it?",
                 "acceptedAnswer": {
                   "@type": "Answer",
-                  "text": "No. airgap is an independent open-source project that uses GMI Cloud AgentBox v2 for sandboxes and GMI MaaS for inference."
+                  "text": "The airgap binary and a GMI Cloud account. Sandboxes need a compute-scoped AgentBox key; injection scans and repo audits need an inference key. Local scanners and tool discovery work with no credentials at all."
+                }
+              },
+              {
+                "@type": "Question",
+                "name": "Which agents does it work with?",
+                "acceptedAnswer": {
+                  "@type": "Answer",
+                  "text": "airgap setup configures Claude Code, Cursor, VS Code and Factory Droid. Any other stdio MCP client, Windsurf included, can use the JSON config. airgap serve exposes the same tools over HTTP for hosted or shared setups."
+                }
+              },
+              {
+                "@type": "Question",
+                "name": "Is this an official GMI Cloud product?",
+                "acceptedAnswer": {
+                  "@type": "Answer",
+                  "text": "No. airgap is an independent open-source project by Dhruvil Mistry that uses GMI Cloud AgentBox v2 for sandboxes and GMI MaaS for inference."
+                }
+              },
+              {
+                "@type": "Question",
+                "name": "How is airgap different from running Docker on my laptop?",
+                "acceptedAnswer": {
+                  "@type": "Answer",
+                  "text": "Local Docker shares your host kernel, mounts local sockets or volumes, requires a heavy background daemon (Docker Desktop), and still risks host contamination if a container escapes. airgap executes commands in single-use disposable Linux microVMs on GMI Cloud—zero local Docker required, zero host resource overhead, and the sandbox is destroyed immediately when done."
+                }
+              },
+              {
+                "@type": "Question",
+                "name": "Does airgap require Docker or local virtual machines installed?",
+                "acceptedAnswer": {
+                  "@type": "Answer",
+                  "text": "No. airgap requires zero local Docker daemons, zero local VMs, and zero local container runtimes. It is a single, zero-dependency native Rust binary (or runnable directly via 'npx -y airgap-mcp')."
+                }
+              },
+              {
+                "@type": "Question",
+                "name": "Can I use airgap without installing Rust or Cargo?",
+                "acceptedAnswer": {
+                  "@type": "Answer",
+                  "text": "Yes. If you have Node.js 18+, run 'npx -y airgap-mcp setup --yes'. You can also download prebuilt standalone binaries for Linux, macOS, and Windows via our one-line shell and PowerShell installers."
                 }
               }
             ]
