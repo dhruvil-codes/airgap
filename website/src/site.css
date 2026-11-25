@@ -4263,6 +4263,10 @@ a:hover > .star-ic {
     overflow-x: auto;
     scrollbar-width: none;
   }
+  .install .seg-tab {
+    padding: 0 8px;
+    font-size: 12px;
+  }
   .install-cmd {
     font-size: 12.5px;
   }
