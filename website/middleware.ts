@@ -2,7 +2,28 @@
 // Markdown) get each page's Markdown twin instead of the HTML app shell. Browsers and search crawlers
 // are untouched. Every matched page has a prerendered `<path>.md` (the homepage uses /index.md).
 export const config = {
-  matcher: ["/", "/docs", "/guides", "/about", "/contact", "/privacy", "/terms", "/conditions"],
+  matcher: [
+    "/",
+    "/docs",
+    "/guides",
+    "/guides/verify-pr",
+    "/guides/verify-patch",
+    "/guides/run",
+    "/guides/issue-text",
+    "/guides/manifest",
+    "/guides/scrub",
+    "/guides/audit",
+    "/guides/docker-vs-microvm",
+    "/guides/prompt-injection-rce",
+    "/guides/supply-chain-hardening",
+    "/guides/secret-scrubbing",
+    "/guides/team-playbook",
+    "/about",
+    "/contact",
+    "/privacy",
+    "/terms",
+    "/conditions",
+  ],
 };
 
 const AGENT_USER_AGENTS = /\b(ChatGPT-User|Claude-User|Perplexity-User|MistralAI-User|DuckAssistBot|Google-Agent|Gemini-User|meta-externalfetcher)\b/i;

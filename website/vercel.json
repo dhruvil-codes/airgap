@@ -13,6 +13,10 @@
       "headers": [{ "key": "Vary", "value": "Accept, User-Agent" }]
     },
     {
+      "source": "/guides/:page(verify-pr|verify-patch|run|issue-text|manifest|scrub|audit|docker-vs-microvm|prompt-injection-rce|supply-chain-hardening|secret-scrubbing|team-playbook)",
+      "headers": [{ "key": "Vary", "value": "Accept, User-Agent" }]
+    },
+    {
       "source": "/(.*)\\.md",
       "headers": [
         { "key": "Content-Type", "value": "text/markdown; charset=utf-8" },
@@ -72,6 +76,7 @@
     { "source": "/api", "destination": "/api/router?route=/api" },
     { "source": "/api/:path*", "destination": "/api/router?route=/api/:path*" },
     { "source": "/:page(docs|guides|about|contact|privacy|terms|conditions)", "destination": "/:page/index.html" },
+    { "source": "/guides/:page(verify-pr|verify-patch|run|issue-text|manifest|scrub|audit|docker-vs-microvm|prompt-injection-rce|supply-chain-hardening|secret-scrubbing|team-playbook)", "destination": "/guides/:page/index.html" },
     {
       "source": "/:path*",
       "has": [{ "type": "header", "key": "accept", "value": ".*(text/markdown|application/json).*" }],

@@ -119,7 +119,19 @@ All read-only, unauthenticated and CORS-enabled. They answer questions about air
 
 - [Homepage as Markdown](https://www.useairgap.dev/index.md): the problem, how one call works, gates, tools and comparison with local Docker.
 - [Docs](https://www.useairgap.dev/docs.md): install, register, credentials, doctor, all 8 tools and configuration.
-- [Guides](https://www.useairgap.dev/guides.md): step-by-step recipes for verifying a PR, testing a patch, running tests, scanning issues, auditing manifests, scrubbing logs and auditing a repo.
+- [Guides](https://www.useairgap.dev/guides.md): index of every guide below.
+  - [Verify a pull request](https://www.useairgap.dev/guides/verify-pr.md)
+  - [Test a local patch](https://www.useairgap.dev/guides/verify-patch.md)
+  - [Run tests or a one-off command](https://www.useairgap.dev/guides/run.md)
+  - [Act on untrusted issue text](https://www.useairgap.dev/guides/issue-text.md)
+  - [Audit a dependency manifest](https://www.useairgap.dev/guides/manifest.md)
+  - [Scrub logs before sharing](https://www.useairgap.dev/guides/scrub.md)
+  - [Run a security review](https://www.useairgap.dev/guides/audit.md)
+  - [Docker vs. remote microVMs](https://www.useairgap.dev/guides/docker-vs-microvm.md)
+  - [Stopping prompt injection RCE](https://www.useairgap.dev/guides/prompt-injection-rce.md)
+  - [Blocking malicious install scripts](https://www.useairgap.dev/guides/supply-chain-hardening.md)
+  - [Zero credential leakage](https://www.useairgap.dev/guides/secret-scrubbing.md)
+  - [The zero-trust MCP playbook](https://www.useairgap.dev/guides/team-playbook.md)
 - [Setup guide](https://www.useairgap.dev/docs/setup.md): `airgap setup` flags, files written per client, credentials, routing rules, doctor and installer options.
 - [Tool and configuration reference](https://www.useairgap.dev/docs/reference.md): every tool's inputs and behaviour, images, environment variables, cleanup and receipts.
 - [Hosting with airgap serve](https://www.useairgap.dev/docs/hosting.md): Streamable HTTP, Fly.io and Railway deploys, bearer auth, BYOK headers and client configs.

@@ -10,7 +10,8 @@ import GradualBlur from "@/components/GradualBlur";
 import { scrollToTarget } from "./smooth";
 import { BASE } from "./content";
 import { DocsPage } from "./pages/Docs";
-import { GuidesPage } from "./pages/Guides";
+import { GuideDetailPage, GuidesPage } from "./pages/Guides";
+import { GUIDE_META, guidePath } from "./guides/meta";
 import { TermsPage } from "./pages/Terms";
 import { ConditionsPage } from "./pages/Conditions";
 import { AboutPage } from "./pages/About";
@@ -26,6 +27,9 @@ export const PAGES: Record<string, { title: string; Page: () => JSX.Element }> =
   "/privacy": { title: "Privacy", Page: PrivacyPage },
   "/terms": { title: "Terms", Page: TermsPage },
   "/conditions": { title: "Conditions of use", Page: ConditionsPage },
+  ...Object.fromEntries(
+    GUIDE_META.map((g) => [guidePath(g.slug), { title: g.title, Page: () => <GuideDetailPage slug={g.slug} /> }]),
+  ),
 };
 
 export const routeOf = (pathname: string) => pathname.slice(BASE.length).replace(/\/+$/, "").replace(/\/index\.html$/, "") || "/";

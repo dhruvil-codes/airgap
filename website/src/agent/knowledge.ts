@@ -1,5 +1,6 @@
 // Agent-facing facts about airgap. The prerender step serializes this to /agent/knowledge.json,
 // which the Vercel functions read, so this file is the single source for the API, MCP, A2A and WebMCP.
+import { GUIDE_META, guidePath } from "../guides/meta";
 
 export const SITE = {
   name: "airgap",
@@ -214,7 +215,8 @@ export type SitePage = { path: string; title: string; description: string; markd
 export const PAGES: SitePage[] = [
   { path: "/", title: "airgap: Run your coding agent in disposable microVMs", description: "Open-source MCP server that runs coding agent installs, builds and tests in disposable Linux microVMs, with injection scans and secret scrubbing.", markdown: "/index.md" },
   { path: "/docs", title: "Docs · airgap", description: "Install airgap, register it with Claude Code, Cursor, VS Code or Factory Droid, set GMI credentials, and look up all 8 MCP tools and configuration.", markdown: "/docs.md" },
-  { path: "/guides", title: "Guides · airgap", description: "Step-by-step airgap guides: verify a GitHub PR, test a local patch, run tests in a sandbox, scan issue text, audit manifests and scrub logs.", markdown: "/guides.md" },
+  { path: "/guides", title: "Guides · airgap", description: "airgap guides: verify a GitHub PR, test a local patch, run tests in a sandbox, scan issue text, audit manifests, scrub logs, and security deep dives on microVMs, prompt injection and supply-chain attacks.", markdown: "/guides.md" },
+  ...GUIDE_META.map((g) => ({ path: guidePath(g.slug), title: `${g.title} · airgap`, description: g.summary, markdown: `${guidePath(g.slug)}.md` })),
   { path: "/about", title: "About · airgap", description: "Who builds airgap, what it is for, the project facts, and every machine-readable endpoint this site offers to AI agents.", markdown: "/about.md" },
   { path: "/contact", title: "Contact · airgap", description: "How to reach the airgap maintainer: GitHub issues for bugs and questions, private email for security reports.", markdown: "/contact.md" },
   { path: "/privacy", title: "Privacy · airgap", description: "What this website and the airgap software collect: no cookies, no analytics, no accounts, and only the data you send in a tool call leaves your machine.", markdown: "/privacy.md" },

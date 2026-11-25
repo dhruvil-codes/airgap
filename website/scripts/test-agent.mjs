@@ -209,6 +209,10 @@ await test("middleware serves Markdown to user agents and Markdown Accept", asyn
   assert.equal(mw("/", { "user-agent": "Googlebot/2.1", accept: "text/html" }), undefined);
   assert.equal(mw("/", { accept: "text/html, text/markdown;q=0.5" }), undefined);
 });
+await test("middleware serves Markdown for every page", async () => {
+  const { config } = await import("../middleware.ts");
+  for (const page of JSON.parse(await readDist("/agent/knowledge.json")).pages) assert.ok(config.matcher.includes(page.path), page.path);
+});
 await test("every middleware path has a Markdown twin", async () => {
   const { config } = await import("../middleware.ts");
   for (const p of config.matcher) assert.ok(await exists(join(dist, markdownPath(p))), markdownPath(p));
@@ -342,7 +346,7 @@ await test("vercel.json rewrites only target the router or real files", async ()
   const vercel = JSON.parse(await readFile(join(site, "vercel.json"), "utf8"));
   for (const r of vercel.rewrites) {
     if (r.destination.startsWith("/api/router?route=")) continue;
-    const page = r.source.match(/^\/:page\(([^)]+)\)$/);
+    const page = r.source.match(/^(?:\/[a-z-]+)*\/:page\(([^)]+)\)$/);
     if (page) {
       for (const name of page[1].split("|")) assert.ok(await exists(join(dist, r.destination.replace(":page", name))), `${r.destination} (${name})`);
       continue;

@@ -97,7 +97,7 @@ function blocks(n, pageUrl, depth = 0) {
     flush();
     if (skip(c)) continue;
     const t = c.tag;
-    if (/^h[1-6]$/.test(t)) parts.push(`${"#".repeat(Number(t[1]))} ${inline(c.children, pageUrl).replace(/\[([^\]]*)\]\([^)]*\)/g, "$1").trim()}`);
+    if (/^h[1-6]$/.test(t)) parts.push(`${"#".repeat(Number(t[1]))} ${inline(c.children, pageUrl).replace(/\[([^\]]*)\]\(([^)]*)\)/g, (m, text, href) => (href.startsWith(`${pageUrl}#`) ? text : m)).trim()}`);
     else if (t === "p") { const s = inline(c.children, pageUrl).trim(); if (s) parts.push(s); }
     else if (t === "pre") parts.push("```\n" + textOf(c).replace(/\n+$/, "") + "\n```");
     else if (t === "ul" || t === "ol") {
@@ -153,11 +153,17 @@ function shell(page, html) {
   if (page.path !== "/") {
     out = out.replace(/(<meta (?:property="og:title"|name="twitter:title") content=")[^"]*(")/g, `$1${esc(page.title)}$2`);
     out = out.replace(/(<meta (?:property="og:description"|name="twitter:description") content=")[^"]*(")/g, `$1${esc(page.description)}$2`);
+    const name = page.title.split(" · ")[0];
+    const guide = page.path.startsWith("/guides/");
+    const crumbs = [{ name: "airgap", item: `${O}/` }, ...(guide ? [{ name: "Guides", item: `${O}/guides` }] : []), { name, item: url }];
     const ld = {
       "@context": "https://schema.org",
       "@graph": [
         { "@type": "WebPage", name: page.title, description: page.description, url, isPartOf: { "@type": "WebSite", name: "airgap", url: `${O}/` }, about: { "@id": `${O}/#software` } },
-        { "@type": "BreadcrumbList", itemListElement: [{ "@type": "ListItem", position: 1, name: "airgap", item: `${O}/` }, { "@type": "ListItem", position: 2, name: page.title.split(" · ")[0], item: url }] },
+        { "@type": "BreadcrumbList", itemListElement: crumbs.map((c, i) => ({ "@type": "ListItem", position: i + 1, ...c })) },
+        ...(guide
+          ? [{ "@type": "TechArticle", headline: name, description: page.description, url, inLanguage: "en", dateModified: today, author: { "@type": "Person", name: SITE.author.name, url: SITE.author.url }, publisher: { "@type": "Person", name: SITE.author.name }, about: { "@id": `${O}/#software` }, isPartOf: { "@type": "CollectionPage", name: "airgap guides", url: `${O}/guides` } }]
+          : []),
       ],
     };
     out = out.replace(/<script type="application\/ld\+json">[\s\S]*?<\/script>/, `<script type="application/ld+json">${JSON.stringify(ld)}</script>`);
