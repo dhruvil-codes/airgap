@@ -1,6 +1,8 @@
 # airgap
 
 [![MCP Registry](https://img.shields.io/badge/MCP%20Registry-listed-ff5714?logo=modelcontextprotocol&logoColor=white)](https://registry.modelcontextprotocol.io/v0/servers?search=dev.useairgap/airgap)
+[![npm](https://img.shields.io/npm/v/airgap-mcp?logo=npm&color=cb3837)](https://www.npmjs.com/package/airgap-mcp)
+[![Listed on mcpservers.org](https://mcpservers.org/badge.svg)](https://mcpservers.org/servers/dhruvil-codes/airgap)
 [![CI](https://img.shields.io/github/actions/workflow/status/dhruvil-codes/airgap/ci.yml?branch=main&label=CI)](https://github.com/dhruvil-codes/airgap/actions/workflows/ci.yml)
 [![Rust 1.89+](https://img.shields.io/badge/Rust-1.89%2B-orange?logo=rust)](https://www.rust-lang.org/tools/install)
 [![MCP](https://img.shields.io/badge/MCP-2024--11--05%20%2F%202025--11--25-purple)](https://modelcontextprotocol.io/)

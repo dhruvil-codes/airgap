@@ -121,6 +121,18 @@ export const FAQ: { q: string; a: string }[] = [
     q: "Is this an official GMI Cloud product?",
     a: "No. airgap is an independent open-source project by Dhruvil Mistry that uses GMI Cloud AgentBox v2 for sandboxes and GMI MaaS for inference.",
   },
+  {
+    q: "How is airgap different from running Docker on my laptop?",
+    a: "Local Docker shares your host kernel, mounts local sockets or volumes, requires a heavy background daemon (Docker Desktop), and still risks host contamination if a container escapes. airgap executes commands in single-use disposable Linux microVMs on GMI Cloud—zero local Docker required, zero host resource overhead, and the sandbox is destroyed immediately when done.",
+  },
+  {
+    q: "Does airgap require Docker or local virtual machines installed?",
+    a: "No. airgap requires zero local Docker daemons, zero local VMs, and zero local container runtimes. It is a single, zero-dependency native Rust binary (or runnable directly via 'npx -y airgap-mcp').",
+  },
+  {
+    q: "Can I use airgap without installing Rust or Cargo?",
+    a: "Yes. If you have Node.js 18+, run 'npx -y airgap-mcp setup --yes'. You can also download prebuilt standalone binaries for Linux, macOS, and Windows via our one-line shell and PowerShell installers.",
+  },
 ];
 
 export const FOOTER_COLUMNS: { heading: string; links: { label: string; href: string; external?: boolean }[] }[] = [
