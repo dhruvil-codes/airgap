@@ -76,6 +76,9 @@ await test("install and setup lookups", async () => {
   await isJsonError(await call("/api/router?route=/api/v1/install&platform=amiga"), 404);
   const cursor = await (await call("/api/router?route=/api/v1/setup&client=cursor")).json();
   assert.equal(cursor.setup[0].command, "airgap setup --cursor --yes");
+  const other = await (await call("/api/router?route=/api/v1/setup&client=other")).json();
+  assert.equal(other.setup[0].config.mcpServers.airgap.command, "npx");
+  assert.deepEqual(other.setup[0].config.mcpServers.airgap.args, ["-y", "airgap-mcp"]);
 });
 await test("CORS preflight", async () => {
   const res = await call("/api/router?route=/mcp", { method: "OPTIONS" });
@@ -233,6 +236,7 @@ await test("homepage JSON-LD has sameAs and keywords", async () => {
   const ld = JSON.parse(/<script type="application\/ld\+json">([\s\S]*?)<\/script>/.exec(html)[1]);
   const app = ld["@graph"].find((n) => n["@type"] === "SoftwareApplication");
   assert.ok(app.sameAs.includes("https://github.com/dhruvil-codes/airgap"));
+  assert.ok(app.sameAs.includes("https://mcpservers.org/servers/dhruvil-codes/airgap"));
   assert.match(html, /<meta name="keywords"/);
   assert.match(html, /rel="ard"/);
 });
@@ -289,6 +293,7 @@ await test("llms.txt is well-formed and every link resolves", async () => {
   const llms = await readDist("/llms.txt");
   assert.match(llms, /^# airgap\n\n> /);
   assert.match(llms, /## When to use airgap/);
+  assert.match(llms, /https:\/\/mcpservers\.org\/servers\/dhruvil-codes\/airgap/);
   for (const [, href] of llms.matchAll(/\]\((https:\/\/www\.useairgap\.dev[^)]*)\)/g)) {
     const p = new URL(href).pathname;
     const dynamic = /^\/(api\/v1|ask|mcp)$/.test(p);
