@@ -4,7 +4,7 @@
   --card: #fbfaf7;
   --ink: #111110;
   --ink-2: #3b3a36;
-  --mute: #807d75;
+  --mute: #64615a;
   --line: #dcd9d1;
   --line-2: #c8c4ba;
   --accent: #ff5714;
@@ -29,13 +29,15 @@
 *::after {
   box-sizing: border-box;
 }
-html.lenis {
-  scroll-behavior: auto;
-}
 html {
   scroll-behavior: smooth;
   scroll-padding-top: calc(72px * var(--page-zoom));
   -webkit-text-size-adjust: 100%;
+}
+@media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto;
+  }
 }
 /* Desktop renders at 90%. Media queries use the unzoomed viewport, so applying zoom only above the widest
    breakpoint (1180px) avoids zoom-induced layout changes. vw/vh lengths divide by --page-zoom because zoom
@@ -198,7 +200,8 @@ pre {
   background-image: repeating-linear-gradient(135deg, transparent 0 6px, rgba(255, 255, 255, 0.05) 6px 7px);
 }
 .row--dark .muted,
-.row--dark .lead {
+.row--dark .lead,
+.row--dark .gutter span {
   color: #9a978f;
 }
 .ticks {
@@ -339,11 +342,11 @@ pre {
   background: #2a2a28;
 }
 .btn--accent {
-  background: var(--accent);
+  background: #cc3d00;
   color: #fff;
 }
 .btn--accent:hover {
-  background: #ec4a09;
+  background: #b53600;
 }
 .btn--ghost {
   background: var(--card);
@@ -3958,6 +3961,18 @@ a:hover > .star-ic {
 .prose h2 a:hover {
   color: var(--accent);
 }
+.prose h3 {
+  margin-top: 32px;
+  margin-bottom: 12px;
+  font-size: 19px;
+  line-height: 1.3;
+  letter-spacing: -0.015em;
+  font-weight: 600;
+  color: var(--ink);
+}
+.prose h3:first-child {
+  margin-top: 0;
+}
 .prose p + p,
 .prose p + .doc-code,
 .prose .doc-code + p,
@@ -3968,10 +3983,14 @@ a:hover > .star-ic {
 .prose p + .doc-table,
 .prose .doc-table + p,
 .prose .doc-prompt + .doc-table,
+.prose .doc-table + .doc-code,
+.prose .doc-code + .doc-table,
 .prose p + ul,
 .prose p + ol,
 .prose ul + p,
-.prose ol + p {
+.prose ol + p,
+.prose ul + .doc-code,
+.prose ol + .doc-code {
   margin-top: 16px;
 }
 .prose ul,

@@ -1,7 +1,6 @@
 import "@fontsource-variable/geist";
 import "@fontsource-variable/geist-mono";
 import "./site.css";
-import "./smooth";
 import { StrictMode, type ComponentType } from "react";
 import { createRoot, hydrateRoot } from "react-dom/client";
 import App, { routeOf } from "./App";

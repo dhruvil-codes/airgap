@@ -119,19 +119,19 @@ All read-only, unauthenticated and CORS-enabled. They answer questions about air
 
 - [Homepage as Markdown](https://www.useairgap.dev/index.md): the problem, how one call works, gates, tools and comparison with local Docker.
 - [Docs](https://www.useairgap.dev/docs.md): install, register, credentials, doctor, all 8 tools and configuration.
-- [Guides](https://www.useairgap.dev/guides.md): index of every guide below.
-  - [Verify a pull request](https://www.useairgap.dev/guides/verify-pr.md)
-  - [Test a local patch](https://www.useairgap.dev/guides/verify-patch.md)
-  - [Run tests or a one-off command](https://www.useairgap.dev/guides/run.md)
-  - [Act on untrusted issue text](https://www.useairgap.dev/guides/issue-text.md)
-  - [Audit a dependency manifest](https://www.useairgap.dev/guides/manifest.md)
-  - [Scrub logs before sharing](https://www.useairgap.dev/guides/scrub.md)
-  - [Run a security review](https://www.useairgap.dev/guides/audit.md)
-  - [Docker vs. remote microVMs](https://www.useairgap.dev/guides/docker-vs-microvm.md)
-  - [Stopping prompt injection RCE](https://www.useairgap.dev/guides/prompt-injection-rce.md)
-  - [Blocking malicious install scripts](https://www.useairgap.dev/guides/supply-chain-hardening.md)
-  - [Zero credential leakage](https://www.useairgap.dev/guides/secret-scrubbing.md)
-  - [The zero-trust MCP playbook](https://www.useairgap.dev/guides/team-playbook.md)
+- [Guides](https://www.useairgap.dev/guides.md): index of all 12 walkthroughs and security deep dives below.
+  - [Verify a pull request](https://www.useairgap.dev/guides/verify-pr.md): end-to-end `airgap_verify_pr` pipeline (injection scan, manifest audit, SHA-pinned clone, build, test, redaction, unsigned SHA-256 receipt), parameters, JSON call example and failure modes.
+  - [Test a local patch](https://www.useairgap.dev/guides/verify-patch.md): apply an uncommitted unified diff to clean base files with `airgap_verify_patch`, strict Rust/pytest verification gates, limits and receipt format.
+  - [Run tests or a one-off command](https://www.useairgap.dev/guides/run.md): run commands in a fresh Linux microVM with `airgap_sandbox_run`, automatic image detection, instance sizing, timeouts, concurrency and cleanup guarantees.
+  - [Act on untrusted issue text](https://www.useairgap.dev/guides/issue-text.md): scan GitHub issues, comments and scraped pages with `airgap_scan_injection` before acting; clean/suspicious/malicious verdicts and fail-closed error handling.
+  - [Audit a dependency manifest](https://www.useairgap.dev/guides/manifest.md): local, offline static inspection of `package.json`, `Cargo.toml` and `requirements.txt` with `airgap_audit_supply`, severity rules and scope limits.
+  - [Scrub logs before sharing](https://www.useairgap.dev/guides/scrub.md): local regex and Shannon-entropy redaction with `airgap_redact_secrets`, covered token families and manual-review caveats.
+  - [Run a security review](https://www.useairgap.dev/guides/audit.md): six-phase static defensive review with `airgap_audit_repo`, exact file-and-line quote verification and output schema.
+  - [Docker vs. remote microVMs](https://www.useairgap.dev/guides/docker-vs-microvm.md): kernel isolation, mount blast radius, cross-OS parity and teardown comparison between host shell, local Docker and remote microVMs.
+  - [Stopping prompt injection RCE](https://www.useairgap.dev/guides/prompt-injection-rce.md): how prompt injection turns into host RCE via the lethal trifecta, and how airgap breaks the chain across four layers.
+  - [Blocking malicious install scripts](https://www.useairgap.dev/guides/supply-chain-hardening.md): defending against `postinstall`, `setup.py` and `build.rs` hooks with local audits, `allow_install_scripts=false` and `fail_on_supply_risk=true`.
+  - [Zero credential leakage](https://www.useairgap.dev/guides/secret-scrubbing.md): preventing secrets from entering the agent's context window using deterministic regex rules, entropy thresholds and local-only execution.
+  - [The zero-trust MCP playbook](https://www.useairgap.dev/guides/team-playbook.md): team rollout across Claude Code, Cursor, VS Code and Factory Droid, routing rules vs. client permission gates, and self-hosted `airgap serve` with bearer auth and BYOK headers.
 - [Setup guide](https://www.useairgap.dev/docs/setup.md): `airgap setup` flags, files written per client, credentials, routing rules, doctor and installer options.
 - [Tool and configuration reference](https://www.useairgap.dev/docs/reference.md): every tool's inputs and behaviour, images, environment variables, cleanup and receipts.
 - [Hosting with airgap serve](https://www.useairgap.dev/docs/hosting.md): Streamable HTTP, Fly.io and Railway deploys, bearer auth, BYOK headers and client configs.
