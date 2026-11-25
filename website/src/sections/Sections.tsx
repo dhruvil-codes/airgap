@@ -64,7 +64,7 @@ const REPORT = [
 const JSON_LINES: CodeLine[] = [
   ["{"],
   ["  ", ["key", '"mcpServers"'], ": {"],
-  ["    ", ["key", '"airgap"'], ": { ", ["key", '"command"'], ": ", ["str", '"airgap"'], ", ", ["key", '"args"'], ": [", ["str", '"--mcp"'], "] }"],
+  ["    ", ["key", '"airgap"'], ": { ", ["key", '"command"'], ": ", ["str", '"npx"'], ", ", ["key", '"args"'], ": [", ["str", '"-y"'], ", ", ["str", '"airgap-mcp"'], "] }"],
   ["  }"],
   ["}"],
 ];
@@ -102,8 +102,12 @@ function Step({ n, title, desc, aside, children }: { n: string; title: string; d
 function SetupSteps({ client }: { client: SetupClient }) {
   const [os, setOs] = useState<string>(INSTALL[0].value);
   const install = INSTALL.find((i) => i.value === os) ?? INSTALL[0];
-  const register = client.flag ? `airgap setup ${client.flag} --yes` : null;
-  const all = [install.command, register, "airgap doctor"].filter(Boolean).join("\n");
+  const runner = install.value === "npx" ? "npx -y airgap-mcp" : "airgap";
+  const installCommand = install.value === "npx" ? `${runner} --version` : install.command;
+  const register = client.flag ? `${runner} setup ${client.flag} --yes` : null;
+  const rulesCommand = `${runner} setup --rules-only --yes`;
+  const doctor = `${runner} doctor`;
+  const all = [installCommand, register, doctor].filter(Boolean).join("\n");
 
   return (
     <div className="setup-steps-wrap">
@@ -122,7 +126,7 @@ function SetupSteps({ client }: { client: SetupClient }) {
           title="Install the binary"
           desc="Prebuilt for Linux, macOS and Windows on x86_64 and ARM64. The installer checks checksums first."
           aside={
-            <div className="os-seg" role="radiogroup" aria-label="Operating system">
+            <div className="os-seg" role="radiogroup" aria-label="Install method">
               {INSTALL.map((i) => (
                 <button
                   key={i.value}
@@ -138,7 +142,7 @@ function SetupSteps({ client }: { client: SetupClient }) {
             </div>
           }
         >
-          <CmdLine cmd={install.command} prompt={install.prompt} label="Copy install command" />
+          <CmdLine cmd={installCommand} prompt={install.prompt} label="Copy install command" />
         </Step>
         <Step
           n="02"
@@ -148,7 +152,7 @@ function SetupSteps({ client }: { client: SetupClient }) {
               {client.json ? client.writes : <>Writes <code>{client.writes}</code>.</>}{" "}
               {client.json ? (
                 <>
-                  Add rules for your agent with <code>airgap setup --rules-only --yes</code>.
+                  Add rules for your agent with <code>{rulesCommand}</code>.
                 </>
               ) : (
                 "Does not call GMI or create compute."
@@ -177,7 +181,7 @@ function SetupSteps({ client }: { client: SetupClient }) {
             </>
           }
         >
-          <CmdLine cmd="airgap doctor" label="Copy doctor command" />
+          <CmdLine cmd={doctor} label="Copy doctor command" />
         </Step>
         <Step n="04" title="Ask in plain words" desc="The routing rules pick the right airgap tool. You never have to name one.">
           <CmdLine cmd={client.prompt} prompt=">" label="Copy example prompt" />

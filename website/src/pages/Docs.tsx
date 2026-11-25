@@ -1,4 +1,4 @@
-import { INSTALL, LINKS } from "../content";
+import { INSTALL, LINKS, MCP_JSON } from "../content";
 import { Cmd, DocPage, DocTable, type DocSection } from "./DocLayout";
 
 const c = (s: string) => <code>{s}</code>;
@@ -27,13 +27,13 @@ const SECTIONS: DocSection[] = [
     title: "Install",
     body: (
       <>
-        <p>Prebuilt binaries cover x86_64 and ARM64 on Linux, macOS and Windows. The installers verify checksums before replacing anything.</p>
-        <Cmd>{`# macOS / Linux\n${INSTALL[0].command}`}</Cmd>
-        <Cmd>{`# Windows (PowerShell)\n${INSTALL[1].command}`}</Cmd>
-        <Cmd>{`# From source (not published on crates.io)\n${INSTALL[2].command}`}</Cmd>
-        <Cmd>{`# npm (Node.js 18+, runs the MCP server directly)\nnpx -y airgap-mcp`}</Cmd>
+        <p>Start with npx on any supported OS (Node.js 18+), or use a platform installer. Prebuilt binaries cover x86_64 and ARM64 on Linux, macOS and Windows, and every download is checksum-verified.</p>
+        <Cmd>{`# Cross-platform zero-install setup (Node.js 18+)\n${INSTALL[0].command}`}</Cmd>
+        <Cmd>{`# macOS / Linux\n${INSTALL[1].command}`}</Cmd>
+        <Cmd>{`# Windows (PowerShell)\n${INSTALL[2].command}`}</Cmd>
+        <Cmd>{`# From source (not published on crates.io)\n${INSTALL[3].command}`}</Cmd>
         <p>
-          The <a href="https://www.npmjs.com/package/airgap-mcp">npm launcher</a> downloads and verifies the matching release, caches it, then starts {c("airgap --mcp")}. Arguments pass through, so {c("npx -y airgap-mcp setup --yes")} runs the normal setup flow.
+          The <a href={LINKS.npm}>npm launcher</a> downloads and verifies the matching release, then caches it. With no arguments, {c("npx -y airgap-mcp")} starts {c("airgap --mcp")}. Arguments such as {c("setup --yes")} pass through to airgap.
         </p>
         <p>
           Set {c("AIRGAP_VERSION")} to pin a release, {c("AIRGAP_INSTALL_DIR")} to choose an install directory, or{" "}
@@ -62,7 +62,7 @@ const SECTIONS: DocSection[] = [
           ]}
         />
         <p>Any other stdio MCP client, such as Windsurf, can use this entry:</p>
-        <Cmd>{`{\n  "mcpServers": {\n    "airgap": { "command": "airgap", "args": ["--mcp"] }\n  }\n}`}</Cmd>
+        <Cmd>{MCP_JSON}</Cmd>
         <p>
           Adding an MCP server does not disable an agent's own terminal. If every command must go through airgap, restrict
           your client's tool permissions too.

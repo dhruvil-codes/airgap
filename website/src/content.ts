@@ -1,5 +1,5 @@
 import type { LucideIcon } from "lucide-react";
-import { BookOpen, Compass, FileText, Layers, Scale, ShieldCheck, Terminal, Workflow } from "lucide-react";
+import { BookOpen, Compass, FileText, Layers, Package, Scale, Server, ShieldCheck, Terminal, Workflow } from "lucide-react";
 
 // Vite base URL without the trailing slash, so links keep working if the site moves under a sub-path.
 export const BASE = import.meta.env.BASE_URL.replace(/\/$/, "");
@@ -29,6 +29,8 @@ export const LINKS = {
   apache: `${REPO}/blob/main/LICENSE-APACHE`,
   securityModel: `${REPO}/blob/main/docs/security-model.md`,
   mcpRegistry: "https://registry.modelcontextprotocol.io/v0/servers?search=dev.useairgap/airgap",
+  npm: "https://www.npmjs.com/package/airgap-mcp",
+  mcpservers: "https://mcpservers.org/servers/dhruvil-codes/airgap",
 } as const;
 
 export type NavLink = { href: string; title: string; desc: string; icon: LucideIcon; external?: boolean };
@@ -44,10 +46,13 @@ export const RESOURCE_NAV: NavLink[] = [
   { href: at("/docs"), title: "Docs", desc: "Install, setup, credentials, all 8 tools and config", icon: BookOpen },
   { href: at("/guides"), title: "Guides", desc: "Step-by-step: verify a PR, test a patch, scrub logs", icon: Compass },
   { href: LINKS.changelog, title: "Changelog", desc: "Everything that shipped in v0.2.0", icon: FileText, external: true },
+  { href: LINKS.npm, title: "npm package", desc: "Run airgap with npx, no global install needed", icon: Package, external: true },
+  { href: LINKS.mcpservers, title: "mcpservers.org directory", desc: "Browse the approved community directory listing", icon: Server, external: true },
   { href: at("/terms"), title: "Terms & conditions", desc: "License, warranty, data and usage conditions", icon: Scale },
 ];
 
 export const INSTALL = [
+  { value: "npx", label: "npx", prompt: "$", command: "npx -y airgap-mcp setup --yes" },
   { value: "sh", label: "macOS / Linux", prompt: "$", command: `curl -fsSL ${RAW}/install.sh | bash` },
   { value: "ps", label: "Windows", prompt: ">", command: `irm ${RAW}/install.ps1 | iex` },
   { value: "cargo", label: "Cargo", prompt: "$", command: `cargo install --git ${REPO} --locked` },
@@ -85,7 +90,7 @@ export type SetupClient = {
 
 export const MCP_JSON = `{
   "mcpServers": {
-    "airgap": { "command": "airgap", "args": ["--mcp"] }
+    "airgap": { "command": "npx", "args": ["-y", "airgap-mcp"] }
   }
 }`;
 
@@ -159,6 +164,8 @@ export const FOOTER_COLUMNS: { heading: string; links: { label: string; href: st
       { label: "About", href: at("/about") },
       { label: "Contact", href: at("/contact") },
       { label: "GitHub", href: LINKS.repo, external: true },
+      { label: "npm package", href: LINKS.npm, external: true },
+      { label: "mcpservers.org directory", href: LINKS.mcpservers, external: true },
       { label: "Issues", href: LINKS.issues, external: true },
       { label: "Security policy", href: LINKS.security, external: true },
     ],

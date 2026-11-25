@@ -89,6 +89,7 @@ const SECTIONS: DocSection[] = [
         <li>{ext(LINKS.releases, "Releases and prebuilt binaries ↗")}</li>
         <li>{ext(SITE.registryUrl, "Official MCP Registry entry ↗")}</li>
         <li>{ext(SITE.npmUrl, "npm package ↗")}</li>
+        <li>{ext(SITE.mcpserversUrl, "mcpservers.org directory ↗")}</li>
         <li>{ext(LINKS.changelog, "Changelog ↗")}</li>
         <li>
           <a href={at("/contact")}>Contact the maintainer</a>

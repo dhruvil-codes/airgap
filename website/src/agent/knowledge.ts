@@ -13,6 +13,7 @@ export const SITE = {
   registryUrl: "https://registry.modelcontextprotocol.io/v0/servers?search=dev.useairgap/airgap",
   npmPackage: "airgap-mcp",
   npmUrl: "https://www.npmjs.com/package/airgap-mcp",
+  mcpserversUrl: "https://mcpservers.org/servers/dhruvil-codes/airgap",
   tagline: "Let your agent run anything. Just not on your machine.",
   summary:
     "airgap is an open-source Rust MCP server that runs an AI coding agent's installs, builds and tests in single-use Linux microVMs on GMI Cloud AgentBox v2. It scans untrusted text for prompt injection, audits dependency manifests before install, and redacts secrets from output.",
@@ -187,7 +188,7 @@ export const CLIENT_SETUP = [
   { client: "cursor", label: "Cursor", command: "airgap setup --cursor --yes", writes: [".cursor/mcp.json", "~/.cursor/mcp.json", ".cursorrules"] },
   { client: "vscode", label: "VS Code", command: "airgap setup --vscode --yes", writes: [".vscode/mcp.json", ".mcp.json", ".github/copilot-instructions.md"] },
   { client: "factory-droid", label: "Factory Droid", command: "airgap setup --droid --yes", writes: [".factory/mcp.json", "~/.factory/mcp.json", "AGENTS.md"] },
-  { client: "other", label: "Any stdio MCP client (e.g. Windsurf)", config: { mcpServers: { airgap: { command: "airgap", args: ["--mcp"] } } } },
+  { client: "other", label: "Any stdio MCP client (e.g. Windsurf)", config: { mcpServers: { airgap: { command: "npx", args: ["-y", "airgap-mcp"] } } } },
 ] as const;
 
 export const LIMITS = [
